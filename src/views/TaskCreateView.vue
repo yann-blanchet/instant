@@ -1,43 +1,39 @@
 <template>
-  <section class="notes-screen">
+  <section class="notes-screen notes-bottom-sheet">
+    <div class="notes-sheet-handle" aria-hidden="true"></div>
     <header class="notes-header">
       <div class="notes-header-left">
-        <button class="notes-back" type="button" aria-label="Back" @click="handleBack">
-          ‹
-        </button>
         <div>
-          <h1 class="notes-title">Add Task</h1>
+          <h1 class="notes-title">{{ headerTitle }}</h1>
           <div class="notes-subtitle">
             {{ project ? project.name : "Quick task" }}
           </div>
         </div>
       </div>
+      <div class="notes-header-right">
+        <button
+          class="notes-assignee-button"
+          type="button"
+          @click="isAssigneeSheetOpen = true"
+        >
+          {{ assigneeLabel }}
+        </button>
+      </div>
     </header>
 
     <div class="notes-stack">
-      <div class="notes-list notes-form">
-        <div class="notes-grid">
-          <label class="notes-field">
-            <span class="notes-label">Status</span>
-            <select v-model="form.status" class="notes-select">
-              <option value="open">Open</option>
-              <option value="done">Done</option>
-            </select>
-          </label>
-          <label class="notes-field">
-            <span class="notes-label">Assignee</span>
-            <select v-model="form.intervenant_id" class="notes-select">
-              <option :value="null">Unassigned</option>
-              <option v-for="person in intervenants" :key="person.id" :value="person.id">
-                {{ person.name }}
-              </option>
-            </select>
-          </label>
-        </div>
-      </div>
-
       <div class="notes-list">
-        <div class="notes-section-label">Observations</div>
+        <div class="notes-section-header">
+          <div class="notes-section-label">Observations</div>
+          <button
+            class="notes-section-action"
+            type="button"
+            aria-label="Add observation"
+            @click="openTextSheet"
+          >
+            +
+          </button>
+        </div>
         <div v-if="!taskRecord?.observations?.length" class="notes-row notes-row-empty">
           Aucune observation.
         </div>
@@ -53,7 +49,17 @@
       </div>
 
       <div class="notes-list">
-        <div class="notes-section-label">Photos</div>
+        <div class="notes-section-header">
+          <div class="notes-section-label">Photos</div>
+          <button
+            class="notes-section-action"
+            type="button"
+            aria-label="Add photo"
+            @click="openImagePicker"
+          >
+            +
+          </button>
+        </div>
         <div v-if="photoPreviewUrls.length === 0" class="notes-row notes-row-empty">
           Aucune photo.
         </div>
@@ -71,56 +77,8 @@
     </div>
 
     <div class="notes-bottom-bar">
-      <button class="notes-bottom-btn" type="button" aria-label="Text" @click="openTextSheet">
-        <svg class="notes-bottom-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M4 20h4l11-11a2.5 2.5 0 0 0-4-4L4 16v4z"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.8"
-          />
-          <path
-            d="M13.5 6.5l4 4"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="1.8"
-          />
-        </svg>
-      </button>
-      <button class="notes-bottom-btn" type="button" aria-label="Image" @click="openImagePicker">
-        <svg class="notes-bottom-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M6 7h2l1.2-2h5.6L16 7h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"
-            fill="none"
-            stroke="currentColor"
-            stroke-linejoin="round"
-            stroke-width="1.8"
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="3.3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          />
-        </svg>
-      </button>
-      <button class="notes-bottom-send" type="button" aria-label="Send" @click="sendAndBack">
-        <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M5 12h14M15 6l4 6-4 6"
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.8"
-          />
-        </svg>
-      </button>
+      <button class="notes-bottom-cancel" type="button" @click="handleBack">Cancel</button>
+      <button class="notes-bottom-save" type="button" @click="sendAndBack">Save</button>
       <input
         ref="imageInput"
         type="file"
@@ -190,6 +148,39 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="isAssigneeSheetOpen"
+      class="notes-sheet-backdrop"
+      @click="isAssigneeSheetOpen = false"
+    >
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-sheet-title">Assignee</div>
+        <button
+          class="notes-sheet-row"
+          type="button"
+          @click="selectAssignee(null)"
+        >
+          Unassigned
+        </button>
+        <button
+          v-for="person in intervenants"
+          :key="person.id"
+          class="notes-sheet-row"
+          type="button"
+          @click="selectAssignee(person.id)"
+        >
+          {{ person.name }}
+        </button>
+        <button
+          class="notes-sheet-row notes-sheet-cancel"
+          type="button"
+          @click="isAssigneeSheetOpen = false"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -200,17 +191,23 @@ import { useRoute, useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
-import type { Task, TaskPhoto, TaskStatus } from "../db/types";
+import type { Task, TaskPhoto } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 
 const router = useRouter();
 const route = useRoute();
 
+const editingTaskId = computed(() => {
+  const id = route.params.taskId;
+  return typeof id === "string" && id.length > 0 ? id : null;
+});
+
 const projectId = computed(() => {
   const id = route.params.id;
   if (typeof id === "string" && id.length > 0) return id;
   const queryId = route.query.projectId;
-  return typeof queryId === "string" && queryId.length > 0 ? queryId : null;
+  if (typeof queryId === "string" && queryId.length > 0) return queryId;
+  return taskRecord.value?.project_id ?? null;
 });
 
 const project = useLiveQuery(
@@ -222,14 +219,27 @@ const project = useLiveQuery(
 );
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
+const isAssigneeSheetOpen = ref(false);
+const headerTitle = computed(() => (editingTaskId.value ? "Edit Task" : "Add Task"));
 
 const form = reactive<{
-  status: TaskStatus;
   intervenant_id: string | null;
 }>({
-  status: "open",
   intervenant_id: null,
 });
+
+const assigneeLabel = computed(() => {
+  if (!form.intervenant_id) return "Unassigned";
+  return (
+    intervenants.value.find((person) => person.id === form.intervenant_id)?.name ??
+    "Unassigned"
+  );
+});
+
+const selectAssignee = (id: string | null) => {
+  form.intervenant_id = id;
+  isAssigneeSheetOpen.value = false;
+};
 
 const createdTaskId = ref<string | null>(null);
 const taskRecord = ref<Task | null>(null);
@@ -250,6 +260,12 @@ const imagePreviewUrl = ref<string | null>(null);
 const imageInput = ref<HTMLInputElement | null>(null);
 const textAreaRef = ref<HTMLTextAreaElement | null>(null);
 const contentListRef = ref<HTMLDivElement | null>(null);
+
+const hasContent = computed(() => {
+  const observationsCount = taskRecord.value?.observations?.length ?? 0;
+  const photoCount = taskRecord.value?.photo_ids?.length ?? 0;
+  return observationsCount + photoCount > 0;
+});
 
 const revokePreview = () => {
   if (imagePreviewUrl.value) {
@@ -374,6 +390,26 @@ watch(
   { immediate: true },
 );
 
+watch(
+  editingTaskId,
+  (taskId) => {
+    if (taskId) {
+      createdTaskId.value = taskId;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => taskRecord.value?.intervenant_id,
+  (id) => {
+    if (editingTaskId.value) {
+      form.intervenant_id = id ?? null;
+    }
+  },
+  { immediate: true },
+);
+
 const ensureTask = async () => {
   if (createdTaskId.value) return createdTaskId.value;
   const taskId = makeId();
@@ -381,7 +417,7 @@ const ensureTask = async () => {
   await db.tasks.add({
     id: taskId,
     project_id: projectId.value,
-    status: form.status,
+    status: "open",
     intervenant_id: form.intervenant_id,
     audio_url: null,
     photo_ids: [],
@@ -395,16 +431,14 @@ const ensureTask = async () => {
 };
 
 watch(
-  () => [form.status, form.intervenant_id],
+  () => form.intervenant_id,
   async () => {
     if (!createdTaskId.value) {
-      const hasChanges = form.status !== "open" || form.intervenant_id !== null;
-      if (!hasChanges) return;
+      if (form.intervenant_id == null || !hasContent.value) return;
       await ensureTask();
       return;
     }
     await db.tasks.update(createdTaskId.value, {
-      status: form.status,
       intervenant_id: form.intervenant_id,
       updated_at: nowIso(),
     });
@@ -502,14 +536,18 @@ const sendImage = async () => {
 };
 
 const sendAndBack = async () => {
+  if (!hasContent.value) {
+    handleBack();
+    return;
+  }
   await ensureOngoingVisit();
-  await ensureTask();
   handleBack();
 };
 
 const handleBack = () => {
-  if (projectId.value) {
-    router.push(`/projects/${projectId.value}`);
+  const targetProjectId = projectId.value ?? taskRecord.value?.project_id ?? null;
+  if (targetProjectId) {
+    router.push(`/projects/${targetProjectId}`);
     return;
   }
   router.push("/");
@@ -536,6 +574,24 @@ onBeforeUnmount(() => {
   gap: 18px;
 }
 
+.notes-bottom-sheet {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.notes-sheet-handle {
+  width: 48px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--notes-border);
+  margin: 10px auto 6px;
+}
+
 .notes-header {
   display: flex;
   justify-content: space-between;
@@ -547,6 +603,27 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+}
+
+.notes-header-right {
+  display: flex;
+  align-items: flex-start;
+}
+
+.notes-assignee-button {
+  border: 1px solid var(--notes-border);
+  background: var(--notes-panel);
+  color: var(--notes-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 140px;
+  text-align: left;
+}
+
+.notes-assignee-button:hover {
+  background: var(--notes-hover);
 }
 
 .notes-title {
@@ -576,6 +653,31 @@ onBeforeUnmount(() => {
   letter-spacing: 0.08em;
   color: var(--notes-muted);
   margin-top: 4px;
+}
+
+.notes-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notes-section-action {
+  border: 2px solid var(--notes-border);
+  background: transparent;
+  color: var(--notes-accent);
+  border-radius: 999px;
+  width: 40px;
+  height: 40px;
+  font-size: 26px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-section-action:hover {
+  background: var(--notes-hover);
 }
 
 .notes-stack {
@@ -615,6 +717,7 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
 
 .notes-input,
 .notes-textarea,
@@ -711,7 +814,28 @@ onBeforeUnmount(() => {
   padding: 12px 20px;
   display: flex;
   gap: 12px;
-  justify-content: space-evenly;
+  justify-content: space-between;
+}
+
+.notes-bottom-cancel,
+.notes-bottom-save {
+  flex: 1;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notes-bottom-cancel {
+  border: 1px solid var(--notes-border);
+  background: transparent;
+  color: var(--notes-text);
+}
+
+.notes-bottom-save {
+  border: 2px solid var(--notes-accent);
+  background: #000;
+  color: var(--notes-accent);
 }
 
 .notes-bottom-btn {

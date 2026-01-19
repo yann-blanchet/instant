@@ -82,6 +82,7 @@
         v-for="task in activeTaskGroup.items"
         :key="task.id"
         class="notes-row notes-task-row"
+        @click="openTask(task)"
       >
         <div class="notes-row-text">
           <div
@@ -123,13 +124,22 @@
         </div>
         <div class="notes-task-footer">
           <span class="notes-row-meta">{{ formatRelativeTime(task.updated_at) }}</span>
-          <button
-            class="notes-status"
-            type="button"
-            @click.stop.prevent="toggleTaskStatus(task)"
-          >
-            {{ task.status === "done" ? "Done" : "Open" }}
-          </button>
+          <div class="notes-task-actions">
+            <button
+              class="notes-status"
+              type="button"
+              @click.stop.prevent="toggleTaskStatus(task)"
+            >
+              {{ task.status === "done" ? "Done" : "Open" }}
+            </button>
+            <button
+              class="notes-delete"
+              type="button"
+              @click.stop.prevent="deleteTask(task)"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -354,6 +364,10 @@ const closeImageModal = () => {
   selectedImageUrl.value = null;
 };
 
+const openTask = (task: Task) => {
+  router.push(`/tasks/${task.id}/edit`);
+};
+
 onBeforeUnmount(() => {
   revokeTaskContentUrls();
 });
@@ -362,6 +376,13 @@ const toggleTaskStatus = async (task: Task) => {
   const nextStatus = task.status === "done" ? "open" : "done";
   await db.tasks.update(task.id, {
     status: nextStatus,
+    updated_at: nowIso(),
+  });
+};
+
+const deleteTask = async (task: Task) => {
+  await db.tasks.update(task.id, {
+    deleted_at: nowIso(),
     updated_at: nowIso(),
   });
 };
@@ -605,6 +626,12 @@ const toggleTaskStatus = async (task: Task) => {
   padding-top: 8px;
 }
 
+.notes-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .notes-observations {
   display: flex;
   flex-direction: column;
@@ -707,6 +734,21 @@ const toggleTaskStatus = async (task: Task) => {
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
+}
+
+.notes-delete {
+  border: 1px solid var(--notes-border);
+  background: transparent;
+  color: var(--notes-muted);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.notes-delete:hover {
+  background: var(--notes-hover);
+  color: var(--notes-text);
 }
 
 .notes-status:hover {

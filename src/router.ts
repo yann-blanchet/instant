@@ -13,6 +13,7 @@ export const router = createRouter({
     { path: "/projects/:id", component: ProjectView, props: true },
     { path: "/projects/:id/visits", component: ProjectPastVisitsView, props: true },
     { path: "/projects/:id/tasks/new", component: TaskCreateView },
+    { path: "/tasks/:taskId/edit", component: TaskCreateView },
     { path: "/tasks/new", component: TaskCreateView },
     { path: "/visits/:id", component: VisitDetailView, props: true },
     { path: "/settings", component: SettingsView },
