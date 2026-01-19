@@ -39,15 +39,41 @@
       </router-link>
     </div>
 
+    <button
+      class="notes-fab"
+      type="button"
+      aria-label="Add project"
+      @click="isCreateProjectOpen = true"
+    >
+      +
+    </button>
+
+    <ProjectFormSheet
+      :open="isCreateProjectOpen"
+      title="Add project"
+      :name="createProjectForm.name"
+      :address="createProjectForm.address"
+      @close="closeCreateProject"
+      @save="saveCreateProject"
+    />
+
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
+import ProjectFormSheet from "../components/ProjectFormSheet.vue";
+import { makeId, nowIso } from "../utils/time";
 
 const searchQuery = ref("");
+const isCreateProjectOpen = ref(false);
+
+const createProjectForm = reactive({
+  name: "",
+  address: "",
+});
 
 const projects = useLiveQuery(
   () => db.projects.filter((item) => !item.deleted_at).toArray(),
@@ -77,6 +103,28 @@ const taskCounts = computed(() => {
   }
   return counts;
 });
+
+const closeCreateProject = () => {
+  isCreateProjectOpen.value = false;
+};
+
+const saveCreateProject = async (payload: { name: string; address: string }) => {
+  const name = payload.name.trim();
+  const address = payload.address.trim();
+  if (!name) return;
+  const timestamp = nowIso();
+  await db.projects.add({
+    id: makeId(),
+    name,
+    address,
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
+  createProjectForm.name = "";
+  createProjectForm.address = "";
+  isCreateProjectOpen.value = false;
+};
 </script>
 
 <style scoped>
@@ -208,5 +256,21 @@ const taskCounts = computed(() => {
 .notes-row-subtitle {
   font-size: 12px;
   color: var(--notes-muted);
+}
+
+.notes-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 2px solid var(--notes-accent);
+  background: #000;
+  color: var(--notes-accent);
+  font-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

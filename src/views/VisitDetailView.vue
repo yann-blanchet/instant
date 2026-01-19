@@ -1,5 +1,6 @@
 <template>
-  <section class="notes-screen">
+  <section class="notes-screen notes-bottom-sheet">
+    <div class="notes-sheet-handle" aria-hidden="true"></div>
     <header class="notes-header">
       <div class="notes-header-left">
         <button class="notes-back" type="button" aria-label="Back" @click="router.back()">
@@ -145,6 +146,24 @@ const addPhoto = async () => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.notes-bottom-sheet {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+  padding-bottom: calc(36px + env(safe-area-inset-bottom));
+}
+
+.notes-sheet-handle {
+  width: 48px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--notes-border);
+  margin: 10px auto 6px;
 }
 
 .notes-header {

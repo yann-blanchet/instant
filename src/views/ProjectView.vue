@@ -2,7 +2,7 @@
   <section class="notes-screen">
     <header class="notes-header">
       <div class="notes-header-left">
-        <button class="notes-back" type="button" aria-label="Back" @click="router.back()">
+        <button class="notes-back" type="button" aria-label="Back" @click="router.push('/')">
           ‹
         </button>
         <div>
@@ -20,15 +20,8 @@
       </button>
     </header>
 
-    <div class="notes-list">
-      <div v-if="!ongoingVisit" class="notes-row notes-row-empty">
-        Aucune visite en cours.
-      </div>
-      <router-link
-        v-else
-        class="notes-row"
-        :to="`/visits/${ongoingVisit.id}`"
-      >
+    <div v-if="ongoingVisit" class="notes-list">
+      <router-link class="notes-row" :to="`/visits/${ongoingVisit.id}`">
         <div class="notes-row-left">
           <span class="notes-folder">📁</span>
           <div class="notes-row-text">
@@ -53,25 +46,28 @@
       </button>
     </div>
 
-    <div class="notes-tabs notes-tabs-small">
-      <button
-        class="notes-tab"
-        :class="{ active: activeTaskTab === 'open' }"
-        type="button"
-        @click="activeTaskTab = 'open'"
-      >
-        <span>Open</span>
-        <span class="notes-tab-count">{{ taskGroups.open.length }}</span>
-      </button>
-      <button
-        class="notes-tab"
-        :class="{ active: activeTaskTab === 'done' }"
-        type="button"
-        @click="activeTaskTab = 'done'"
-      >
-        <span>Done</span>
-        <span class="notes-tab-count">{{ taskGroups.done.length }}</span>
-      </button>
+    <div class="notes-section-header">
+      <div class="notes-section-label">Observations</div>
+      <div class="notes-badges">
+        <button
+          class="notes-badge"
+          :class="{ active: activeTaskTab === 'open' }"
+          type="button"
+          @click="activeTaskTab = 'open'"
+        >
+          Open
+          <span class="notes-badge-count">{{ taskGroups.open.length }}</span>
+        </button>
+        <button
+          class="notes-badge"
+          :class="{ active: activeTaskTab === 'done' }"
+          type="button"
+          @click="activeTaskTab = 'done'"
+        >
+          Done
+          <span class="notes-badge-count">{{ taskGroups.done.length }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="notes-list">
@@ -166,6 +162,9 @@
       @click="isActionsSheetOpen = false"
     >
       <div class="notes-sheet notes-actions-sheet" @click.stop>
+        <button class="notes-sheet-row" type="button" @click="openEditProject">
+          Edit project
+        </button>
         <button class="notes-sheet-row" type="button" @click="handleExportReport">
           Export report (PDF)
         </button>
@@ -181,6 +180,15 @@
         </button>
       </div>
     </div>
+
+    <ProjectFormSheet
+      :open="isEditProjectSheetOpen"
+      title="Edit project"
+      :name="project?.name ?? ''"
+      :address="project?.address ?? ''"
+      @close="closeEditProject"
+      @save="saveEditProject"
+    />
   </section>
 </template>
 
@@ -191,6 +199,7 @@ import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
+import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import type { Task, TaskPhoto } from "../db/types";
 import { formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
@@ -199,8 +208,10 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 const activeTaskTab = ref<"open" | "done">("open");
 const isActionsSheetOpen = ref(false);
+const isEditProjectSheetOpen = ref(false);
 const isImageModalOpen = ref(false);
 const selectedImageUrl = ref<string | null>(null);
+
 
 const project = useLiveQuery(
   () => db.projects.get(props.id),
@@ -330,6 +341,25 @@ const handleExportReport = () => {
 const showPastVisits = () => {
   isActionsSheetOpen.value = false;
   router.push(`/projects/${props.id}/visits`);
+};
+
+const openEditProject = () => {
+  isActionsSheetOpen.value = false;
+  isEditProjectSheetOpen.value = true;
+};
+
+const closeEditProject = () => {
+  isEditProjectSheetOpen.value = false;
+};
+
+const saveEditProject = async (payload: { name: string; address: string }) => {
+  if (!project.value) return;
+  await db.projects.update(project.value.id, {
+    name: payload.name.trim() || project.value.name,
+    address: payload.address.trim(),
+    updated_at: nowIso(),
+  });
+  isEditProjectSheetOpen.value = false;
 };
 
 const startVisit = async () => {
@@ -639,6 +669,7 @@ const deleteTask = async (task: Task) => {
   margin-top: 4px;
 }
 
+
 .notes-photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -662,45 +693,40 @@ const deleteTask = async (task: Task) => {
   align-items: flex-start;
 }
 
-.notes-tabs {
+.notes-section-header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notes-badges {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  background: var(--notes-panel);
-  padding: 6px;
-  border-radius: 14px;
 }
 
-.notes-tabs-small {
-  width: 100%;
-}
-
-.notes-tab {
-  flex: 1;
-  border: none;
+.notes-badge {
+  border: 1px solid var(--notes-border);
   background: transparent;
   color: var(--notes-muted);
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-weight: 600;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 
-.notes-tab.active {
+.notes-badge.active {
   background: var(--notes-panel-strong);
   color: var(--notes-text);
 }
 
-.notes-tab-count {
-  font-size: 12px;
+.notes-badge-count {
+  font-size: 11px;
   color: var(--notes-muted);
   font-weight: 500;
-}
-
-.notes-tab.active .notes-tab-count {
-  color: var(--notes-text);
 }
 
 .notes-pill {
