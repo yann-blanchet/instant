@@ -220,7 +220,7 @@ const project = useLiveQuery(
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 const isAssigneeSheetOpen = ref(false);
-const headerTitle = computed(() => (editingTaskId.value ? "Edit Task" : "Add Task"));
+const headerTitle = computed(() => "Nouvelle observation");
 
 const form = reactive<{
   intervenant_id: string | null;
@@ -410,13 +410,14 @@ watch(
   { immediate: true },
 );
 
-const ensureTask = async () => {
+const ensureTask = async (visitId: string | null) => {
   if (createdTaskId.value) return createdTaskId.value;
   const taskId = makeId();
   const timestamp = nowIso();
   await db.tasks.add({
     id: taskId,
     project_id: projectId.value,
+    visit_id: visitId,
     status: "open",
     intervenant_id: form.intervenant_id,
     audio_url: null,
@@ -435,7 +436,8 @@ watch(
   async () => {
     if (!createdTaskId.value) {
       if (form.intervenant_id == null || !hasContent.value) return;
-      await ensureTask();
+      const visitId = await ensureOngoingVisit();
+      await ensureTask(visitId);
       return;
     }
     await db.tasks.update(createdTaskId.value, {
@@ -482,8 +484,8 @@ const ensureOngoingVisit = async () => {
 
 const sendText = async () => {
   if (!textDraft.value.trim()) return;
-  await ensureOngoingVisit();
-  const taskId = await ensureTask();
+  const visitId = await ensureOngoingVisit();
+  const taskId = await ensureTask(visitId);
   const task = await db.tasks.get(taskId);
   const nextObservations = [...(task?.observations ?? []), textDraft.value.trim()];
   await db.tasks.update(taskId, {
@@ -516,8 +518,8 @@ const closeImageSheet = () => {
 
 const sendImage = async () => {
   if (!imageFile.value) return;
-  await ensureOngoingVisit();
-  const taskId = await ensureTask();
+  const visitId = await ensureOngoingVisit();
+  const taskId = await ensureTask(visitId);
   const timestamp = nowIso();
   const photoId = makeId();
   await db.task_photos.add({
@@ -540,7 +542,8 @@ const sendAndBack = async () => {
     handleBack();
     return;
   }
-  await ensureOngoingVisit();
+  const visitId = await ensureOngoingVisit();
+  await ensureTask(visitId);
   handleBack();
 };
 

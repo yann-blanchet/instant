@@ -3,7 +3,7 @@
     <header class="notes-header">
       <h1 class="notes-title">Projets</h1>
       <router-link class="notes-action" to="/settings" aria-label="Settings">
-        ⋯
+        ⚙︎
       </router-link>
     </header>
 
@@ -153,10 +153,11 @@ const saveCreateProject = async (payload: { name: string; address: string }) => 
 .notes-action {
   color: var(--notes-accent);
   font-weight: 700;
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1;
   padding: 2px 8px;
 }
+
 
 .notes-search {
   position: relative;

@@ -3,9 +3,6 @@
     <div class="notes-sheet-handle" aria-hidden="true"></div>
     <header class="notes-header">
       <div class="notes-header-left">
-        <button class="notes-back" type="button" aria-label="Back" @click="router.back()">
-          ‹
-        </button>
         <div>
           <h1 class="notes-title">
             Visite {{ formatVisitNumber(visit?.visit_number) }}
@@ -13,14 +10,19 @@
           <div class="notes-subtitle">{{ project?.name }}</div>
         </div>
       </div>
-      <button
-        class="notes-action"
-        type="button"
-        @click="endVisit"
-        :disabled="!!visit?.ended_at"
-      >
-        End Visit
-      </button>
+      <div class="notes-header-actions">
+        <button class="notes-action" type="button" @click="exportVisitPdf">
+          PDF
+        </button>
+        <button
+          class="notes-action"
+          type="button"
+          @click="endVisit"
+          :disabled="!!visit?.ended_at"
+        >
+          End Visit
+        </button>
+      </div>
     </header>
 
     <div v-if="!visit" class="notes-list">
@@ -57,16 +59,21 @@
         </div>
       </div>
 
-      <div class="notes-actions">
-        <button class="notes-button notes-button-primary" @click="save">Save Changes</button>
-        <router-link class="notes-button" to="/">Back</router-link>
-      </div>
+    </div>
+
+    <div class="notes-bottom-bar">
+      <button class="notes-bottom-cancel" type="button" @click="handleBack">
+        Cancel
+      </button>
+      <button class="notes-bottom-save" type="button" @click="save">
+        Save
+      </button>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
@@ -87,6 +94,21 @@ const project = useLiveQuery(
 const photos = useLiveQuery(
   () => db.visit_photos.filter((photo) => photo.visit_id === props.id).toArray(),
   [],
+);
+const openObservations = useLiveQuery(
+  async () => {
+    if (!visit.value) return [] as string[];
+    const tasks = await db.tasks
+      .filter(
+        (task) =>
+          !task.deleted_at &&
+          task.status === "open" &&
+          task.visit_id === visit.value?.id,
+      )
+      .toArray();
+    return tasks.flatMap((task) => task.observations ?? []);
+  },
+  [] as string[],
 );
 
 const draft = reactive({
@@ -113,6 +135,11 @@ const save = async () => {
     comment: draft.comment,
     updated_at: nowIso(),
   });
+  handleBack();
+};
+
+const handleBack = () => {
+  router.back();
 };
 
 const endVisit = async () => {
@@ -134,6 +161,42 @@ const addPhoto = async () => {
     deleted_at: null,
   });
   photoUrl.value = "";
+};
+
+const exportVisitPdf = () => {
+  if (!visit.value) return;
+  const title = `Visite ${formatVisitNumber(visit.value.visit_number)}`;
+  const observations = openObservations.value;
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          h1 { font-size: 22px; margin: 0 0 8px; }
+          h2 { font-size: 14px; text-transform: uppercase; color: #666; margin: 20px 0 8px; }
+          ul { padding-left: 16px; }
+          li { margin-bottom: 6px; }
+        </style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <div>${project.value?.name ?? ""}</div>
+        <div>${visit.value.date}</div>
+        <h2>Observations</h2>
+        ${
+          observations.length
+            ? `<ul>${observations.map((o) => `<li>${o}</li>`).join("")}</ul>`
+            : "<div>No open observations.</div>"
+        }
+      </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  win.print();
 };
 </script>
 
@@ -166,11 +229,51 @@ const addPhoto = async () => {
   margin: 10px auto 6px;
 }
 
+.notes-bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  border-top: none;
+  padding: 12px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.notes-bottom-cancel,
+.notes-bottom-save {
+  flex: 1;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notes-bottom-cancel {
+  border: 1px solid var(--notes-border);
+  background: transparent;
+  color: var(--notes-text);
+}
+
+.notes-bottom-save {
+  border: 2px solid var(--notes-accent);
+  background: #000;
+  color: var(--notes-accent);
+}
+
 .notes-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+}
+
+.notes-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .notes-header-left {
