@@ -1,0 +1,635 @@
+<template>
+  <section class="notes-screen">
+    <header class="notes-header">
+      <div class="notes-header-left">
+        <button class="notes-back" type="button" aria-label="Back" @click="router.back()">
+          ‹
+        </button>
+        <div></div>
+      </div>
+      <button class="notes-action" type="button" @click="softDelete">Archive</button>
+    </header>
+
+    <div v-if="!task" class="notes-list">
+      <div class="notes-row notes-row-empty">Task not found.</div>
+    </div>
+
+    <div v-else class="notes-stack">
+      <div class="notes-list notes-form">
+        <div class="notes-grid">
+          <label class="notes-field">
+            <span class="notes-label">Status</span>
+            <select v-model="draft.status" class="notes-select">
+              <option value="open">Open</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+          <label class="notes-field">
+            <span class="notes-label">Assignee</span>
+            <select v-model="draft.intervenant_id" class="notes-select">
+              <option :value="null">Unassigned</option>
+              <option v-for="person in intervenants" :key="person.id" :value="person.id">
+                {{ person.name }}
+              </option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div ref="contentListRef" class="notes-list">
+        <div v-if="taskItems.length === 0" class="notes-row notes-row-empty">
+          Aucun contenu.
+        </div>
+        <div v-for="item in taskItemViews" :key="item.id" class="notes-item">
+          <div v-if="item.type === 'text'" class="notes-item-text">
+            {{ item.text }}
+          </div>
+          <img
+            v-else
+            class="notes-item-image"
+            :src="item.imageUrl"
+            alt="Task item"
+          />
+        </div>
+      </div>
+
+    </div>
+
+    <div v-if="task" class="notes-bottom-bar">
+      <button class="notes-bottom-btn" type="button" aria-label="Text" @click="openTextSheet">
+        <svg class="notes-bottom-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4 20h4l11-11a2.5 2.5 0 0 0-4-4L4 16v4z"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.8"
+          />
+          <path
+            d="M13.5 6.5l4 4"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="1.8"
+          />
+        </svg>
+      </button>
+      <button class="notes-bottom-btn" type="button" aria-label="Image" @click="openImagePicker">
+        <svg class="notes-bottom-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M6 7h2l1.2-2h5.6L16 7h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"
+            fill="none"
+            stroke="currentColor"
+            stroke-linejoin="round"
+            stroke-width="1.8"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="3.3"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          />
+        </svg>
+      </button>
+      <input
+        ref="imageInput"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        class="notes-hidden-input"
+        @change="handleImagePicked"
+      />
+    </div>
+
+    <div v-if="isTextSheetOpen" class="notes-sheet-backdrop" @click="closeTextSheet">
+      <div class="notes-sheet" @click.stop>
+        <textarea
+          ref="textAreaRef"
+          v-model="textDraft"
+          class="notes-sheet-textarea"
+          rows="4"
+          placeholder="Écrire un texte..."
+        />
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeTextSheet">Cancel</button>
+          <button
+            class="notes-button notes-button-primary"
+            type="button"
+            aria-label="Send text"
+            @click="sendText"
+          >
+            <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 12h14M15 6l4 6-4 6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="isImageSheetOpen" class="notes-sheet-backdrop" @click="closeImageSheet">
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-image-preview">
+          <img v-if="imagePreviewUrl" :src="imagePreviewUrl" alt="Preview" />
+        </div>
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeImageSheet">Cancel</button>
+          <button
+            class="notes-button notes-button-primary"
+            type="button"
+            aria-label="Send image"
+            @click="sendImage"
+          >
+            <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 12h14M15 6l4 6-4 6"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useLiveQuery } from "../composables/useLiveQuery";
+import { db } from "../db";
+import type { TaskItem, TaskStatus } from "../db/types";
+import { makeId, nowIso } from "../utils/time";
+
+const props = defineProps<{ id: string }>();
+const router = useRouter();
+
+const task = useLiveQuery(() => db.tasks.get(props.id), null);
+const taskItems = useLiveQuery(
+  () => db.task_items.where("task_id").equals(props.id).sortBy("created_at"),
+  [] as TaskItem[],
+);
+const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
+
+const draft = reactive<{
+  status: TaskStatus;
+  intervenant_id: string | null;
+}>({
+  status: "open",
+  intervenant_id: null,
+});
+
+const isTextSheetOpen = ref(false);
+const isImageSheetOpen = ref(false);
+const textDraft = ref("");
+const imageFile = ref<File | null>(null);
+const imagePreviewUrl = ref<string | null>(null);
+const imageInput = ref<HTMLInputElement | null>(null);
+const textAreaRef = ref<HTMLTextAreaElement | null>(null);
+const contentListRef = ref<HTMLDivElement | null>(null);
+
+const taskItemViews = ref<
+  Array<
+    | { id: string; type: "text"; text: string }
+    | { id: string; type: "image"; imageUrl: string }
+  >
+>([]);
+
+const revokePreview = () => {
+  if (imagePreviewUrl.value) {
+    URL.revokeObjectURL(imagePreviewUrl.value);
+    imagePreviewUrl.value = null;
+  }
+};
+
+watch(
+  taskItems,
+  (items) => {
+    taskItemViews.value.forEach((item) => {
+      if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
+    });
+    taskItemViews.value = items.map((item) => {
+      if (item.type === "image" && item.image_blob) {
+        return {
+          id: item.id,
+          type: "image",
+          imageUrl: URL.createObjectURL(item.image_blob),
+        };
+      }
+      return {
+        id: item.id,
+        type: "text",
+        text: item.text ?? "",
+      };
+    });
+    nextTick(() => {
+      if (contentListRef.value) {
+        contentListRef.value.scrollTo({
+          top: contentListRef.value.scrollHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+  },
+  { immediate: true },
+);
+
+const isDraftReady = ref(false);
+
+watch(
+  task,
+  (value) => {
+    if (!value) return;
+    draft.status = value.status;
+    draft.intervenant_id = value.intervenant_id ?? null;
+    isDraftReady.value = true;
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [draft.status, draft.intervenant_id],
+  async () => {
+    if (!isDraftReady.value || !task.value) return;
+    await db.tasks.update(task.value.id, {
+      status: draft.status,
+      intervenant_id: draft.intervenant_id,
+      updated_at: nowIso(),
+    });
+  },
+);
+
+const openTextSheet = async () => {
+  isTextSheetOpen.value = true;
+  await nextTick();
+  textAreaRef.value?.focus();
+};
+
+const closeTextSheet = () => {
+  isTextSheetOpen.value = false;
+  textDraft.value = "";
+};
+
+const sendText = async () => {
+  if (!textDraft.value.trim()) return;
+  await db.task_items.add({
+    id: makeId(),
+    task_id: props.id,
+    type: "text",
+    text: textDraft.value.trim(),
+    image_blob: null,
+    created_at: nowIso(),
+  });
+  closeTextSheet();
+};
+
+const openImagePicker = () => {
+  imageInput.value?.click();
+};
+
+const handleImagePicked = (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  imageFile.value = file;
+  revokePreview();
+  imagePreviewUrl.value = URL.createObjectURL(file);
+  isImageSheetOpen.value = true;
+  input.value = "";
+};
+
+const closeImageSheet = () => {
+  isImageSheetOpen.value = false;
+  imageFile.value = null;
+  revokePreview();
+};
+
+const sendImage = async () => {
+  if (!imageFile.value) return;
+  await db.task_items.add({
+    id: makeId(),
+    task_id: props.id,
+    type: "image",
+    text: null,
+    image_blob: imageFile.value,
+    created_at: nowIso(),
+  });
+  closeImageSheet();
+};
+
+const softDelete = async () => {
+  if (!task.value) return;
+  await db.tasks.update(task.value.id, {
+    deleted_at: nowIso(),
+    updated_at: nowIso(),
+  });
+};
+
+onBeforeUnmount(() => {
+  taskItemViews.value.forEach((item) => {
+    if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
+  });
+  revokePreview();
+});
+</script>
+
+<style scoped>
+.notes-screen {
+  min-height: 100vh;
+  background: var(--notes-bg);
+  color: var(--notes-text);
+  padding: 28px 20px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.notes-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.notes-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.notes-subtitle {
+  color: var(--notes-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.notes-back {
+  border: none;
+  background: transparent;
+  color: var(--notes-accent);
+  font-size: 28px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.notes-action {
+  color: var(--notes-accent);
+  font-weight: 600;
+  background: transparent;
+  border: none;
+}
+
+.notes-section-label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--notes-muted);
+  margin-top: 4px;
+}
+
+.notes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notes-list {
+  background: var(--notes-panel);
+  border-radius: 16px;
+  overflow: hidden;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: inherit;
+}
+
+.notes-row-empty {
+  color: var(--notes-muted);
+  font-size: 14px;
+}
+
+.notes-form {
+  gap: 16px;
+}
+
+.notes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes-label {
+  font-size: 13px;
+  color: var(--notes-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.notes-input,
+.notes-textarea,
+.notes-select {
+  width: 100%;
+  background: var(--notes-panel-strong);
+  border: 1px solid var(--notes-panel-strong);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--notes-text);
+  font-size: 14px;
+}
+
+.notes-input::placeholder,
+.notes-textarea::placeholder {
+  color: var(--notes-muted);
+}
+
+.notes-row-inline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.notes-button {
+  background: var(--notes-panel-strong);
+  border: none;
+  color: var(--notes-text);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.notes-button-primary {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+  font-weight: 600;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.notes-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notes-chip {
+  background: var(--notes-chip);
+  color: var(--notes-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.notes-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--notes-border);
+}
+
+.notes-item:last-child {
+  border-bottom: none;
+}
+
+.notes-item-text {
+  white-space: pre-wrap;
+  color: var(--notes-text);
+  font-size: 14px;
+}
+
+.notes-item-image {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.notes-bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  border-top: none;
+  padding: 12px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.notes-bottom-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--notes-accent);
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-bottom-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.notes-send-icon {
+  width: 18px;
+  height: 18px;
+}
+
+
+.notes-hidden-input {
+  display: none;
+}
+
+.notes-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px 12px;
+  z-index: 50;
+}
+
+.notes-sheet {
+  width: 100%;
+  max-width: none;
+  background: var(--notes-panel);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-sheet-textarea {
+  width: 100%;
+  min-height: 120px;
+  background: var(--notes-panel-strong);
+  border: 1px solid var(--notes-panel-strong);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--notes-text);
+  font-size: 14px;
+}
+
+.notes-sheet-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.notes-image-preview {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--notes-panel-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-image-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+</style>
