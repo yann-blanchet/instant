@@ -84,7 +84,7 @@
         class="notes-row notes-task-row"
       >
         <div class="notes-row-text">
-          <div v-if="taskContentMap[task.id]?.items?.length" class="notes-content-list">
+        <div v-if="taskContentMap[task.id]?.items?.length" class="notes-content-list">
             <div
               v-for="(item, index) in taskContentMap[task.id].items"
               :key="`${task.id}-${index}`"
@@ -93,7 +93,13 @@
               <div v-if="item.type === 'text'" class="notes-row-subtitle">
                 {{ item.text }}
               </div>
-              <img v-else class="notes-content-image" :src="item.imageUrl" alt="Task content" />
+            <img
+              v-else
+              class="notes-content-image"
+              :src="item.imageUrl"
+              alt="Task content"
+              @click.stop="openImageModal(item.imageUrl)"
+            />
             </div>
           </div>
           <div v-else class="notes-row-subtitle">Aucun contenu.</div>
@@ -119,6 +125,13 @@
     >
       +
     </button>
+
+    <ImageModal
+      :open="isImageModalOpen"
+      :src="selectedImageUrl"
+      alt="Task image"
+      @close="closeImageModal"
+    />
 
     <div
       v-if="isActionsSheetOpen"
@@ -150,6 +163,7 @@ import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
+import ImageModal from "../components/ImageModal.vue";
 import type { Task, TaskItem } from "../db/types";
 import { formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
@@ -158,6 +172,8 @@ const props = defineProps<{ id: string }>();
 const router = useRouter();
 const activeTaskTab = ref<"open" | "done">("open");
 const isActionsSheetOpen = ref(false);
+const isImageModalOpen = ref(false);
+const selectedImageUrl = ref<string | null>(null);
 
 const project = useLiveQuery(
   () => db.projects.get(props.id),
@@ -297,6 +313,16 @@ const startVisit = async () => {
     deleted_at: null,
   });
   router.push(`/visits/${visitId}`);
+};
+
+const openImageModal = (url: string) => {
+  selectedImageUrl.value = url;
+  isImageModalOpen.value = true;
+};
+
+const closeImageModal = () => {
+  isImageModalOpen.value = false;
+  selectedImageUrl.value = null;
 };
 
 onBeforeUnmount(() => {
@@ -532,7 +558,7 @@ const toggleTaskStatus = async (task: Task) => {
 
 .notes-row-subtitle {
   font-size: 12px;
-  color: var(--notes-muted);
+  color: var(--notes-text);
 }
 
 .notes-row-meta {
@@ -567,6 +593,7 @@ const toggleTaskStatus = async (task: Task) => {
   max-width: 160px;
   border-radius: 8px;
   object-fit: cover;
+  cursor: pointer;
 }
 
 .notes-row-empty {
