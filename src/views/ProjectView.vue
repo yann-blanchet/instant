@@ -119,7 +119,17 @@
           </div>
         </div>
         <div class="notes-task-footer">
-          <span class="notes-row-meta">{{ formatRelativeTime(task.updated_at) }}</span>
+          <div class="notes-row-meta">
+            <div>{{ formatRelativeTime(task.updated_at) }}</div>
+            <div v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
+              <span v-if="task.opened_visit_id">
+                Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
+              </span>
+              <span v-if="task.done_visit_id">
+                Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
+              </span>
+            </div>
+          </div>
           <div class="notes-task-actions">
             <button
               class="notes-status"
@@ -250,6 +260,14 @@ const visits = useLiveQuery(
 const ongoingVisit = computed(
   () => visits.value.find((visit) => !visit.ended_at) ?? null,
 );
+
+const visitNumberMap = computed(() => {
+  const map = new Map<string, number | undefined>();
+  visits.value.forEach((visit) => {
+    map.set(visit.id, visit.visit_number);
+  });
+  return map;
+});
 
 
 const taskGroups = computed(() => {
@@ -405,8 +423,13 @@ onBeforeUnmount(() => {
 
 const toggleTaskStatus = async (task: Task) => {
   const nextStatus = task.status === "done" ? "open" : "done";
+  const visitId = ongoingVisit.value?.id ?? null;
+  const openedVisitId = nextStatus === "open" ? visitId : task.opened_visit_id ?? null;
+  const doneVisitId = nextStatus === "done" ? visitId : null;
   await db.tasks.update(task.id, {
     status: nextStatus,
+    opened_visit_id: openedVisitId,
+    done_visit_id: doneVisitId,
     updated_at: nowIso(),
   });
 };
@@ -643,6 +666,14 @@ const deleteTask = async (task: Task) => {
 }
 
 .notes-row-meta {
+  font-size: 11px;
+  color: var(--notes-muted);
+}
+
+.notes-visit-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--notes-muted);
 }

@@ -13,6 +13,8 @@ export interface Task {
   id: string;
   project_id?: string | null;
   visit_id?: string | null;
+  opened_visit_id?: string | null;
+  done_visit_id?: string | null;
   description?: string | null;
   status: TaskStatus;
   intervenant_id?: string | null;

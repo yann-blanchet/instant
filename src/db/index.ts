@@ -87,6 +87,7 @@ export class AppDB extends Dexie {
     this.version(6).stores(schemaV6);
     this.version(7).stores(schemaV7);
     this.version(8).stores(schemaV7);
+    this.version(9).stores(schemaV7);
   }
 }
 

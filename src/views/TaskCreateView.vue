@@ -418,6 +418,8 @@ const ensureTask = async (visitId: string | null) => {
     id: taskId,
     project_id: projectId.value,
     visit_id: visitId,
+    opened_visit_id: visitId,
+    done_visit_id: null,
     status: "open",
     intervenant_id: form.intervenant_id,
     audio_url: null,

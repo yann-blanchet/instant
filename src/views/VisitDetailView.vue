@@ -135,10 +135,27 @@ const endVisit = async () => {
 };
 
 
-const exportVisitPdf = () => {
+const exportVisitPdf = async () => {
   if (!visit.value) return;
   const title = `Visite ${formatVisitNumber(visit.value.visit_number)}`;
   const observations = openObservations.value;
+  const visitId = visit.value.id;
+  const statusTasks = await db.tasks
+    .filter(
+      (task) =>
+        !task.deleted_at &&
+        (task.opened_visit_id === visitId || task.done_visit_id === visitId),
+    )
+    .toArray();
+  const statusLines = statusTasks.map((task) => {
+    const fromStatus = task.done_visit_id === visitId ? "Open" : "—";
+    const toStatus = task.done_visit_id === visitId ? "Done" : "Open";
+    return {
+      label: (task.observations?.[0] ?? "Observation").slice(0, 120),
+      fromStatus,
+      toStatus,
+    };
+  });
   const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(`
@@ -151,6 +168,7 @@ const exportVisitPdf = () => {
           h2 { font-size: 14px; text-transform: uppercase; color: #666; margin: 20px 0 8px; }
           ul { padding-left: 16px; }
           li { margin-bottom: 6px; }
+          .status-line { margin-bottom: 6px; }
         </style>
       </head>
       <body>
@@ -162,6 +180,17 @@ const exportVisitPdf = () => {
           observations.length
             ? `<ul>${observations.map((o) => `<li>${o}</li>`).join("")}</ul>`
             : "<div>No open observations.</div>"
+        }
+        <h2>Changements de statut</h2>
+        ${
+          statusLines.length
+            ? statusLines
+                .map(
+                  (line) =>
+                    `<div class="status-line">${line.label}: ${line.fromStatus} → ${line.toStatus}</div>`,
+                )
+                .join("")
+            : "<div>Aucun changement de statut.</div>"
         }
       </body>
     </html>
