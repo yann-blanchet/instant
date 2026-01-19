@@ -25,11 +25,13 @@
         <div class="notes-row-left">
           <span class="notes-folder">📁</span>
           <div class="notes-row-text">
-            <div class="notes-row-title">{{ visit.date }}</div>
-            <div class="notes-row-subtitle">
-              {{ visit.comment || "Visite" }}
-              <span v-if="visit.id === ongoingVisit?.id">· En cours</span>
-            </div>
+          <div class="notes-row-title">
+            Visite {{ formatVisitNumber(visit.visit_number) }}
+          </div>
+          <div class="notes-row-subtitle">
+            {{ visit.date }} · {{ visit.comment || "Visite" }}
+            <span v-if="visit.id === ongoingVisit?.id">· En cours</span>
+          </div>
           </div>
         </div>
         <div class="notes-row-right">
@@ -46,6 +48,7 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
+import { formatVisitNumber } from "../utils/format";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -63,18 +66,14 @@ const visits = useLiveQuery(
   [],
 );
 
-const ongoingVisit = computed(
-  () => visits.value.find((visit) => !visit.ended_at) ?? null,
-);
 
 const visitList = computed(() => {
-  const items = [...visits.value];
+  const items = visits.value.filter((visit) => visit.ended_at);
   return items.sort((a, b) => {
-    if (!a.ended_at && b.ended_at) return -1;
-    if (a.ended_at && !b.ended_at) return 1;
     return b.date.localeCompare(a.date);
   });
 });
+
 </script>
 
 <style scoped>
@@ -121,6 +120,7 @@ const visitList = computed(() => {
   line-height: 1;
   padding: 2px 6px;
 }
+
 
 .notes-list {
   background: var(--notes-panel);
@@ -194,12 +194,4 @@ const visitList = computed(() => {
   padding: 16px;
 }
 
-.notes-tag {
-  background: var(--notes-panel-strong);
-  color: var(--notes-text);
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
 </style>

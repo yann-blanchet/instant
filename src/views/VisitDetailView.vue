@@ -6,7 +6,9 @@
           ‹
         </button>
         <div>
-          <h1 class="notes-title">Visit Detail</h1>
+          <h1 class="notes-title">
+            Visite {{ formatVisitNumber(visit?.visit_number) }}
+          </h1>
           <div class="notes-subtitle">{{ project?.name }}</div>
         </div>
       </div>
@@ -67,6 +69,7 @@ import { reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
+import { formatVisitNumber } from "../utils/format";
 import { makeId, nowIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();

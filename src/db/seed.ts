@@ -67,6 +67,7 @@ export async function seedIfEmpty() {
     project_id: project.id,
     date: todayIso(),
     comment: "Initial walkthrough and rough measurements.",
+    visit_number: 1,
     ended_at: null,
     created_at,
     updated_at: created_at,

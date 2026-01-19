@@ -36,6 +36,7 @@ export interface Visit {
   project_id: string;
   date: string;
   comment: string;
+  visit_number?: number;
   ended_at?: string | null;
   created_at: string;
   updated_at: string;

@@ -20,6 +20,39 @@
       </button>
     </header>
 
+    <div class="notes-list">
+      <div v-if="!ongoingVisit" class="notes-row notes-row-empty">
+        Aucune visite en cours.
+      </div>
+      <router-link
+        v-else
+        class="notes-row"
+        :to="`/visits/${ongoingVisit.id}`"
+      >
+        <div class="notes-row-left">
+          <span class="notes-folder">📁</span>
+          <div class="notes-row-text">
+          <div class="notes-row-title">
+            Visite {{ formatVisitNumber(ongoingVisit.visit_number) }}
+          </div>
+          <div class="notes-row-subtitle">
+            {{ ongoingVisit.date }} · {{ ongoingVisit.comment || "Visite en cours" }}
+          </div>
+          </div>
+        </div>
+        <div class="notes-row-right">
+          <span class="notes-tag">En cours</span>
+          <span class="notes-chevron">›</span>
+        </div>
+      </router-link>
+    </div>
+
+    <div v-if="!ongoingVisit" class="notes-cta">
+      <button class="notes-button notes-button-primary" type="button" @click="startVisit">
+        Démarrer une visite
+      </button>
+    </div>
+
     <div class="notes-tabs notes-tabs-small">
       <button
         class="notes-tab"
@@ -45,25 +78,37 @@
       <div v-if="activeTaskGroup.items.length === 0" class="notes-row notes-row-empty">
         Aucune tâche.
       </div>
-      <router-link
+      <div
         v-for="task in activeTaskGroup.items"
         :key="task.id"
-        :to="`/tasks/${task.id}`"
-        class="notes-row"
+        class="notes-row notes-task-row"
       >
-        <div class="notes-row-left">
-          <span class="notes-folder">📁</span>
-          <div class="notes-row-text">
-            <div class="notes-row-title">
-              {{ task.description || "Tâche" }}
+        <div class="notes-row-text">
+          <div v-if="taskContentMap[task.id]?.items?.length" class="notes-content-list">
+            <div
+              v-for="(item, index) in taskContentMap[task.id].items"
+              :key="`${task.id}-${index}`"
+              class="notes-content-item"
+            >
+              <div v-if="item.type === 'text'" class="notes-row-subtitle">
+                {{ item.text }}
+              </div>
+              <img v-else class="notes-content-image" :src="item.imageUrl" alt="Task content" />
             </div>
-            <div class="notes-row-subtitle">Mis à jour {{ task.updated_at }}</div>
           </div>
+          <div v-else class="notes-row-subtitle">Aucun contenu.</div>
         </div>
-        <div class="notes-row-right">
-          <span class="notes-chevron">›</span>
+        <div class="notes-task-footer">
+          <span class="notes-row-meta">{{ formatRelativeTime(task.updated_at) }}</span>
+          <button
+            class="notes-status"
+            type="button"
+            @click.stop.prevent="toggleTaskStatus(task)"
+          >
+            {{ task.status === "done" ? "Done" : "Open" }}
+          </button>
         </div>
-      </router-link>
+      </div>
     </div>
 
     <button
@@ -100,11 +145,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
-import type { Task } from "../db/types";
+import { getNextVisitNumber } from "../db/visits";
+import type { Task, TaskItem } from "../db/types";
+import { formatRelativeTime, formatVisitNumber } from "../utils/format";
+import { makeId, nowIso, todayIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -122,6 +170,31 @@ const tasks = useLiveQuery(
       .filter((task) => !task.deleted_at && task.project_id === props.id)
       .toArray(),
   [] as Task[],
+);
+
+const taskItems = useLiveQuery(
+  async () => {
+    const taskIds = await db.tasks
+      .filter((task) => !task.deleted_at && task.project_id === props.id)
+      .primaryKeys();
+    if (taskIds.length === 0) return [] as TaskItem[];
+    return db.task_items
+      .filter((item) => taskIds.includes(item.task_id))
+      .toArray();
+  },
+  [] as TaskItem[],
+);
+
+const visits = useLiveQuery(
+  () =>
+    db.visits
+      .filter((visit) => !visit.deleted_at && visit.project_id === props.id)
+      .toArray(),
+  [],
+);
+
+const ongoingVisit = computed(
+  () => visits.value.find((visit) => !visit.ended_at) ?? null,
 );
 
 
@@ -149,6 +222,45 @@ const activeTaskGroup = computed(() => {
   return { label: labelMap[activeTaskTab.value], items };
 });
 
+const taskContentMap = ref<
+  Record<string, { items: Array<{ type: "text"; text: string } | { type: "image"; imageUrl: string }> }>
+>({});
+
+const revokeTaskContentUrls = () => {
+  Object.values(taskContentMap.value).forEach((entry) => {
+    entry.items.forEach((item) => {
+      if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
+    });
+  });
+};
+
+watch(
+  taskItems,
+  (items) => {
+    revokeTaskContentUrls();
+    const map: Record<
+      string,
+      { items: Array<{ type: "text"; text: string } | { type: "image"; imageUrl: string }> }
+    > = {};
+    const sorted = [...items].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    for (const item of sorted) {
+      const entry = map[item.task_id] ?? { items: [] };
+      if (item.type === "text" && item.text) {
+        entry.items.push({ type: "text", text: item.text });
+      }
+      if (item.type === "image" && item.image_blob) {
+        entry.items.push({
+          type: "image",
+          imageUrl: URL.createObjectURL(item.image_blob),
+        });
+      }
+      map[item.task_id] = entry;
+    }
+    taskContentMap.value = map;
+  },
+  { immediate: true },
+);
+
 
 const exportPdf = () => {
   alert("PDF export is ready for implementation. Use print for now.");
@@ -163,6 +275,40 @@ const handleExportReport = () => {
 const showPastVisits = () => {
   isActionsSheetOpen.value = false;
   router.push(`/projects/${props.id}/visits`);
+};
+
+const startVisit = async () => {
+  if (ongoingVisit.value) {
+    router.push(`/visits/${ongoingVisit.value.id}`);
+    return;
+  }
+  const timestamp = nowIso();
+  const visitNumber = await getNextVisitNumber(props.id);
+  const visitId = makeId();
+  await db.visits.add({
+    id: visitId,
+    project_id: props.id,
+    date: todayIso(),
+    comment: "",
+    visit_number: visitNumber,
+    ended_at: null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
+  router.push(`/visits/${visitId}`);
+};
+
+onBeforeUnmount(() => {
+  revokeTaskContentUrls();
+});
+
+const toggleTaskStatus = async (task: Task) => {
+  const nextStatus = task.status === "done" ? "open" : "done";
+  await db.tasks.update(task.id, {
+    status: nextStatus,
+    updated_at: nowIso(),
+  });
 };
 </script>
 
@@ -319,6 +465,12 @@ const showPastVisits = () => {
   flex-direction: column;
 }
 
+.notes-list .notes-task-row + .notes-task-row {
+  margin-top: 8px;
+  border-top: none;
+  box-shadow: 0 -8px 0 0 #000;
+}
+
 .notes-row {
   display: flex;
   align-items: center;
@@ -329,6 +481,11 @@ const showPastVisits = () => {
   border: none;
   text-align: left;
   gap: 16px;
+}
+
+.notes-task-row {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .notes-row + .notes-row {
@@ -376,6 +533,40 @@ const showPastVisits = () => {
 .notes-row-subtitle {
   font-size: 12px;
   color: var(--notes-muted);
+}
+
+.notes-row-meta {
+  font-size: 11px;
+  color: var(--notes-muted);
+}
+
+.notes-task-footer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--notes-border);
+  padding-top: 8px;
+}
+
+.notes-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.notes-content-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-content-image {
+  width: 100%;
+  max-width: 160px;
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .notes-row-empty {
@@ -447,6 +638,40 @@ const showPastVisits = () => {
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 11px;
+  font-weight: 600;
+}
+
+.notes-status {
+  border: none;
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.notes-status:hover {
+  background: var(--notes-hover);
+}
+
+.notes-cta {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.notes-button {
+  background: var(--notes-panel-strong);
+  border: none;
+  color: var(--notes-text);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.notes-button-primary {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
   font-weight: 600;
 }
 </style>

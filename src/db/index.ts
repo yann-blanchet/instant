@@ -48,6 +48,30 @@ export class AppDB extends Dexie {
             }
           }),
       );
+    this.version(5)
+      .stores(schema)
+      .upgrade(async (tx) => {
+        const visits = await tx.table("visits").toArray();
+        const byProject = new Map<string, typeof visits>();
+        visits.forEach((visit) => {
+          if (!byProject.has(visit.project_id)) {
+            byProject.set(visit.project_id, []);
+          }
+          byProject.get(visit.project_id)?.push(visit);
+        });
+        for (const projectVisits of byProject.values()) {
+          projectVisits.sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return a.created_at.localeCompare(b.created_at);
+          });
+          projectVisits.forEach((visit, index) => {
+            if (visit.visit_number == null) {
+              visit.visit_number = index + 1;
+            }
+          });
+          await tx.table("visits").bulkPut(projectVisits);
+        }
+      });
   }
 }
 

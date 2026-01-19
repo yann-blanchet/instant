@@ -2,7 +2,7 @@
   <section class="notes-screen">
     <header class="notes-header">
       <div class="notes-header-left">
-        <button class="notes-back" type="button" aria-label="Back" @click="router.back()">
+        <button class="notes-back" type="button" aria-label="Back" @click="handleBack">
           ‹
         </button>
         <div>
@@ -94,6 +94,18 @@
           />
         </svg>
       </button>
+      <button class="notes-bottom-send" type="button" aria-label="Send" @click="sendAndBack">
+        <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M5 12h14M15 6l4 6-4 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.8"
+          />
+        </svg>
+      </button>
       <input
         ref="imageInput"
         type="file"
@@ -168,9 +180,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { liveQuery, type Subscription } from "dexie";
 import { useRoute, useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
+import { getNextVisitNumber } from "../db/visits";
 import type { TaskItem, TaskStatus } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 
@@ -203,13 +217,8 @@ const form = reactive<{
 });
 
 const createdTaskId = ref<string | null>(null);
-const taskItems = useLiveQuery(
-  () => {
-    if (!createdTaskId.value) return Promise.resolve([] as TaskItem[]);
-    return db.task_items.where("task_id").equals(createdTaskId.value).sortBy("created_at");
-  },
-  [] as TaskItem[],
-);
+const taskItems = ref<TaskItem[]>([]);
+let taskItemsSubscription: Subscription | null = null;
 const taskItemViews = ref<
   Array<
     | { id: string; type: "text"; text: string }
@@ -260,6 +269,30 @@ watch(
         });
       }
     });
+  },
+  { immediate: true },
+);
+
+const subscribeTaskItems = (taskId: string | null) => {
+  taskItemsSubscription?.unsubscribe();
+  taskItems.value = [];
+  if (!taskId) return;
+  taskItemsSubscription = liveQuery(() =>
+    db.task_items.where("task_id").equals(taskId).sortBy("created_at"),
+  ).subscribe({
+    next: (items) => {
+      taskItems.value = items;
+    },
+    error: (error) => {
+      console.error("LiveQuery error", error);
+    },
+  });
+};
+
+watch(
+  createdTaskId,
+  (taskId) => {
+    subscribeTaskItems(taskId);
   },
   { immediate: true },
 );
@@ -318,12 +351,14 @@ const ensureOngoingVisit = async () => {
   if (existing) return existing.id;
 
   const timestamp = nowIso();
+  const visitNumber = await getNextVisitNumber(projectId.value);
   const visitId = makeId();
   await db.visits.add({
     id: visitId,
     project_id: projectId.value,
     date: new Date().toISOString().slice(0, 10),
     comment: "",
+    visit_number: visitNumber,
     ended_at: null,
     created_at: timestamp,
     updated_at: timestamp,
@@ -383,11 +418,26 @@ const sendImage = async () => {
   closeImageSheet();
 };
 
+const sendAndBack = async () => {
+  await ensureOngoingVisit();
+  await ensureTask();
+  handleBack();
+};
+
+const handleBack = () => {
+  if (projectId.value) {
+    router.push(`/projects/${projectId.value}`);
+    return;
+  }
+  router.push("/");
+};
+
 onBeforeUnmount(() => {
-  draftItemViews.value.forEach((item) => {
+  taskItemViews.value.forEach((item) => {
     if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
   });
   revokePreview();
+  taskItemsSubscription?.unsubscribe();
 });
 </script>
 
@@ -557,17 +607,31 @@ onBeforeUnmount(() => {
   padding: 12px 20px;
   display: flex;
   gap: 12px;
-  justify-content: space-between;
+  justify-content: space-evenly;
 }
 
 .notes-bottom-btn {
-  flex: 1;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   color: var(--notes-accent);
-  padding: 10px 12px;
+  padding: 0;
   border-radius: 999px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-bottom-send {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--notes-accent);
+  padding: 0;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
