@@ -87,6 +87,8 @@ const close = () => {
 const save = async () => {
   const timestamp = nowIso();
   const taskId = makeId();
+  const trimmedPhotoUrl = photoUrl.value.trim();
+  const photoId = trimmedPhotoUrl ? makeId() : null;
 
   await db.tasks.add({
     id: taskId,
@@ -95,16 +97,18 @@ const save = async () => {
     status: form.status,
     intervenant_id: form.intervenant_id,
     audio_url: null,
+    photo_ids: photoId ? [photoId] : [],
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
   });
 
-  if (photoUrl.value.trim()) {
+  if (photoId) {
     await db.task_photos.add({
-      id: makeId(),
+      id: photoId,
       task_id: taskId,
-      url: photoUrl.value.trim(),
+      url: trimmedPhotoUrl,
+      image_blob: null,
       created_at: timestamp,
       updated_at: timestamp,
       deleted_at: null,

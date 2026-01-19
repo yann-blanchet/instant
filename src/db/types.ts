@@ -1,5 +1,4 @@
 export type TaskStatus = "open" | "done";
-export type TaskItemType = "text" | "image";
 
 export interface Project {
   id: string;
@@ -17,18 +16,11 @@ export interface Task {
   status: TaskStatus;
   intervenant_id?: string | null;
   audio_url?: string | null;
+  photo_ids?: string[];
+  observations?: string[];
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
-}
-
-export interface TaskItem {
-  id: string;
-  task_id: string;
-  type: TaskItemType;
-  text?: string | null;
-  image_blob?: Blob | null;
-  created_at: string;
 }
 
 export interface Visit {
@@ -46,7 +38,8 @@ export interface Visit {
 export interface TaskPhoto {
   id: string;
   task_id: string;
-  url: string;
+  url?: string | null;
+  image_blob?: Blob | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;

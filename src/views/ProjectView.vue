@@ -84,25 +84,42 @@
         class="notes-row notes-task-row"
       >
         <div class="notes-row-text">
-        <div v-if="taskContentMap[task.id]?.items?.length" class="notes-content-list">
+          <div
+            v-if="taskContentMap[task.id]?.observations?.length"
+            class="notes-observations"
+          >
             <div
-              v-for="(item, index) in taskContentMap[task.id].items"
-              :key="`${task.id}-${index}`"
-              class="notes-content-item"
+              v-for="(text, index) in taskContentMap[task.id].observations"
+              :key="`${task.id}-obs-${index}`"
+              class="notes-row-subtitle"
             >
-              <div v-if="item.type === 'text'" class="notes-row-subtitle">
-                {{ item.text }}
-              </div>
-            <img
-              v-else
-              class="notes-content-image"
-              :src="item.imageUrl"
-              alt="Task content"
-              @click.stop="openImageModal(item.imageUrl)"
-            />
+              {{ text }}
             </div>
           </div>
-          <div v-else class="notes-row-subtitle">Aucun contenu.</div>
+
+          <div
+            v-if="taskContentMap[task.id]?.photos?.length"
+            class="notes-photo-grid"
+          >
+            <img
+              v-for="(url, index) in taskContentMap[task.id].photos"
+              :key="`${task.id}-photo-${index}`"
+              class="notes-content-image"
+              :src="url"
+              alt="Task photo"
+              @click.stop="openImageModal(url)"
+            />
+          </div>
+
+          <div
+            v-if="
+              !taskContentMap[task.id]?.observations?.length &&
+              !taskContentMap[task.id]?.photos?.length
+            "
+            class="notes-row-subtitle"
+          >
+            Aucun contenu.
+          </div>
         </div>
         <div class="notes-task-footer">
           <span class="notes-row-meta">{{ formatRelativeTime(task.updated_at) }}</span>
@@ -164,7 +181,7 @@ import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
-import type { Task, TaskItem } from "../db/types";
+import type { Task, TaskPhoto } from "../db/types";
 import { formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
 
@@ -188,17 +205,17 @@ const tasks = useLiveQuery(
   [] as Task[],
 );
 
-const taskItems = useLiveQuery(
+const taskPhotos = useLiveQuery(
   async () => {
     const taskIds = await db.tasks
       .filter((task) => !task.deleted_at && task.project_id === props.id)
       .primaryKeys();
-    if (taskIds.length === 0) return [] as TaskItem[];
-    return db.task_items
-      .filter((item) => taskIds.includes(item.task_id))
+    if (taskIds.length === 0) return [] as TaskPhoto[];
+    return db.task_photos
+      .filter((photo) => taskIds.includes(photo.task_id))
       .toArray();
   },
-  [] as TaskItem[],
+  [] as TaskPhoto[],
 );
 
 const visits = useLiveQuery(
@@ -239,39 +256,51 @@ const activeTaskGroup = computed(() => {
 });
 
 const taskContentMap = ref<
-  Record<string, { items: Array<{ type: "text"; text: string } | { type: "image"; imageUrl: string }> }>
+  Record<string, { observations: string[]; photos: string[] }>
 >({});
 
 const revokeTaskContentUrls = () => {
   Object.values(taskContentMap.value).forEach((entry) => {
-    entry.items.forEach((item) => {
-      if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
+    entry.photos.forEach((url) => {
+      if (url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
     });
   });
 };
 
 watch(
-  taskItems,
-  (items) => {
+  [taskPhotos, tasks],
+  ([photos, taskList]) => {
     revokeTaskContentUrls();
-    const map: Record<
-      string,
-      { items: Array<{ type: "text"; text: string } | { type: "image"; imageUrl: string }> }
-    > = {};
-    const sorted = [...items].sort((a, b) => a.created_at.localeCompare(b.created_at));
-    for (const item of sorted) {
-      const entry = map[item.task_id] ?? { items: [] };
-      if (item.type === "text" && item.text) {
-        entry.items.push({ type: "text", text: item.text });
-      }
-      if (item.type === "image" && item.image_blob) {
-        entry.items.push({
-          type: "image",
-          imageUrl: URL.createObjectURL(item.image_blob),
-        });
-      }
-      map[item.task_id] = entry;
-    }
+    const map: Record<string, { observations: string[]; photos: string[] }> = {};
+    const photosByTask = new Map<string, TaskPhoto[]>();
+    photos.forEach((photo) => {
+      const group = photosByTask.get(photo.task_id) ?? [];
+      group.push(photo);
+      photosByTask.set(photo.task_id, group);
+    });
+
+    taskList.forEach((task) => {
+      const entry = map[task.id] ?? { observations: [], photos: [] };
+      entry.observations = [...(task.observations ?? [])];
+
+      const taskPhotosList = photosByTask.get(task.id) ?? [];
+      const photosById = new Map(taskPhotosList.map((photo) => [photo.id, photo]));
+      const orderedPhotoIds = task.photo_ids ?? [];
+      const photoUrls: string[] = [];
+      orderedPhotoIds.forEach((photoId) => {
+        const photo = photosById.get(photoId);
+        if (photo?.image_blob) {
+          photoUrls.push(URL.createObjectURL(photo.image_blob));
+        } else if (photo?.url) {
+          photoUrls.push(photo.url);
+        }
+      });
+      entry.photos = photoUrls;
+
+      map[task.id] = entry;
+    });
     taskContentMap.value = map;
   },
   { immediate: true },
@@ -576,21 +605,23 @@ const toggleTaskStatus = async (task: Task) => {
   padding-top: 8px;
 }
 
-.notes-content-list {
+.notes-observations {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
 }
 
-.notes-content-item {
-  display: flex;
-  flex-direction: column;
+.notes-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .notes-content-image {
   width: 100%;
-  max-width: 160px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   object-fit: cover;
   cursor: pointer;

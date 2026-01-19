@@ -5,7 +5,6 @@ import type {
   Visit,
   TaskPhoto,
   VisitPhoto,
-  TaskItem,
   Intervenant,
   Category,
 } from "./types";
@@ -16,13 +15,12 @@ export class AppDB extends Dexie {
   visits!: Table<Visit, string>;
   task_photos!: Table<TaskPhoto, string>;
   visit_photos!: Table<VisitPhoto, string>;
-  task_items!: Table<TaskItem, string>;
   intervenants!: Table<Intervenant, string>;
   categories!: Table<Category, string>;
 
   constructor() {
     super("instant_site_inspection");
-    const schema = {
+    const schemaV5 = {
       projects: "id, name, updated_at, deleted_at",
       tasks: "id, project_id, status, updated_at, deleted_at",
       visits: "id, project_id, date, ended_at, updated_at, deleted_at",
@@ -32,12 +30,21 @@ export class AppDB extends Dexie {
       intervenants: "id, name, updated_at, deleted_at",
       categories: "id, name, updated_at, deleted_at",
     };
+    const schemaV6 = {
+      projects: "id, name, updated_at, deleted_at",
+      tasks: "id, project_id, status, updated_at, deleted_at",
+      visits: "id, project_id, date, ended_at, updated_at, deleted_at",
+      task_photos: "id, task_id, updated_at, deleted_at",
+      visit_photos: "id, visit_id, updated_at, deleted_at",
+      intervenants: "id, name, updated_at, deleted_at",
+      categories: "id, name, updated_at, deleted_at",
+    };
 
-    this.version(1).stores(schema);
-    this.version(2).stores(schema);
-    this.version(3).stores(schema);
+    this.version(1).stores(schemaV5);
+    this.version(2).stores(schemaV5);
+    this.version(3).stores(schemaV5);
     this.version(4)
-      .stores(schema)
+      .stores(schemaV5)
       .upgrade((tx) =>
         tx
           .table("tasks")
@@ -49,7 +56,7 @@ export class AppDB extends Dexie {
           }),
       );
     this.version(5)
-      .stores(schema)
+      .stores(schemaV5)
       .upgrade(async (tx) => {
         const visits = await tx.table("visits").toArray();
         const byProject = new Map<string, typeof visits>();
@@ -72,6 +79,7 @@ export class AppDB extends Dexie {
           await tx.table("visits").bulkPut(projectVisits);
         }
       });
+    this.version(6).stores(schemaV6);
   }
 }
 

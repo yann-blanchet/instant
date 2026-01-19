@@ -36,19 +36,34 @@
         </div>
       </div>
 
-      <div ref="contentListRef" class="notes-list">
-        <div v-if="taskItems.length === 0" class="notes-row notes-row-empty">
-          Aucun contenu.
+      <div class="notes-list">
+        <div class="notes-section-label">Observations</div>
+        <div v-if="!taskRecord?.observations?.length" class="notes-row notes-row-empty">
+          Aucune observation.
         </div>
-        <div v-for="item in taskItemViews" :key="item.id" class="notes-item">
-          <div v-if="item.type === 'text'" class="notes-item-text">
-            {{ item.text }}
+        <div v-else class="notes-observation-list">
+          <div
+            v-for="(text, index) in taskRecord.observations"
+            :key="`obs-${index}`"
+            class="notes-item-text"
+          >
+            {{ text }}
           </div>
+        </div>
+      </div>
+
+      <div class="notes-list">
+        <div class="notes-section-label">Photos</div>
+        <div v-if="photoPreviewUrls.length === 0" class="notes-row notes-row-empty">
+          Aucune photo.
+        </div>
+        <div v-else class="notes-photo-grid">
           <img
-            v-else
-            class="notes-item-image"
-            :src="item.imageUrl"
-            alt="Draft item"
+            v-for="(url, index) in photoPreviewUrls"
+            :key="`photo-${index}`"
+            class="notes-photo"
+            :src="url"
+            alt="Task photo"
           />
         </div>
       </div>
@@ -185,7 +200,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
-import type { TaskItem, TaskStatus } from "../db/types";
+import type { Task, TaskPhoto, TaskStatus } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 
 const router = useRouter();
@@ -217,7 +232,8 @@ const form = reactive<{
 });
 
 const createdTaskId = ref<string | null>(null);
-const taskItems = ref<TaskItem[]>([]);
+const taskRecord = ref<Task | null>(null);
+const taskPhotos = ref<TaskPhoto[]>([]);
 let taskItemsSubscription: Subscription | null = null;
 const taskItemViews = ref<
   Array<
@@ -225,6 +241,7 @@ const taskItemViews = ref<
     | { id: string; type: "image"; imageUrl: string }
   >
 >([]);
+const photoPreviewUrls = ref<string[]>([]);
 const isTextSheetOpen = ref(false);
 const isImageSheetOpen = ref(false);
 const textDraft = ref("");
@@ -241,26 +258,80 @@ const revokePreview = () => {
   }
 };
 
+const revokePhotoUrls = (urls: string[]) => {
+  urls.forEach((url) => {
+    if (url.startsWith("blob:")) {
+      URL.revokeObjectURL(url);
+    }
+  });
+};
+
 watch(
-  taskItems,
-  (items) => {
+  [taskPhotos, taskRecord],
+  ([photos, task]) => {
     taskItemViews.value.forEach((item) => {
       if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
     });
-    taskItemViews.value = items.map((item) => {
-      if (item.type === "image" && item.image_blob) {
-        return {
-          id: item.id,
-          type: "image",
-          imageUrl: URL.createObjectURL(item.image_blob),
-        };
-      }
-      return {
-        id: item.id,
+
+    const nextViews: Array<
+      | { id: string; type: "text"; text: string }
+      | { id: string; type: "image"; imageUrl: string }
+    > = [];
+
+    (task?.observations ?? []).forEach((text, index) => {
+      nextViews.push({
+        id: `${task?.id ?? "task"}-obs-${index}`,
         type: "text",
-        text: item.text ?? "",
-      };
+        text,
+      });
     });
+
+    revokePhotoUrls(photoPreviewUrls.value);
+    const photosById = new Map(photos.map((photo) => [photo.id, photo]));
+    const orderedPhotoIds = task?.photo_ids ?? [];
+    const nextPhotoUrls: string[] = [];
+    orderedPhotoIds.forEach((photoId) => {
+      const photo = photosById.get(photoId);
+      if (photo?.image_blob) {
+        const url = URL.createObjectURL(photo.image_blob);
+        nextViews.push({
+          id: photoId,
+          type: "image",
+          imageUrl: url,
+        });
+        nextPhotoUrls.push(url);
+      } else if (photo?.url) {
+        nextViews.push({
+          id: photoId,
+          type: "image",
+          imageUrl: photo.url,
+        });
+        nextPhotoUrls.push(photo.url);
+      }
+    });
+    photoPreviewUrls.value = nextPhotoUrls;
+
+    const remainingPhotos = photos.filter((photo) => !orderedPhotoIds.includes(photo.id));
+    remainingPhotos
+      .slice()
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .forEach((photo) => {
+        if (photo.image_blob) {
+          nextViews.push({
+            id: photo.id,
+            type: "image",
+            imageUrl: URL.createObjectURL(photo.image_blob),
+          });
+        } else if (photo.url) {
+          nextViews.push({
+            id: photo.id,
+            type: "image",
+            imageUrl: photo.url,
+          });
+        }
+      });
+
+    taskItemViews.value = nextViews;
     nextTick(() => {
       if (contentListRef.value) {
         contentListRef.value.scrollTo({
@@ -275,13 +346,19 @@ watch(
 
 const subscribeTaskItems = (taskId: string | null) => {
   taskItemsSubscription?.unsubscribe();
-  taskItems.value = [];
+  taskRecord.value = null;
+  taskPhotos.value = [];
   if (!taskId) return;
-  taskItemsSubscription = liveQuery(() =>
-    db.task_items.where("task_id").equals(taskId).sortBy("created_at"),
-  ).subscribe({
-    next: (items) => {
-      taskItems.value = items;
+  taskItemsSubscription = liveQuery(async () => {
+    const [task, photos] = await Promise.all([
+      db.tasks.get(taskId),
+      db.task_photos.where("task_id").equals(taskId).toArray(),
+    ]);
+    return { task: task ?? null, photos };
+  }).subscribe({
+    next: ({ task, photos }) => {
+      taskRecord.value = task;
+      taskPhotos.value = photos;
     },
     error: (error) => {
       console.error("LiveQuery error", error);
@@ -307,6 +384,8 @@ const ensureTask = async () => {
     status: form.status,
     intervenant_id: form.intervenant_id,
     audio_url: null,
+    photo_ids: [],
+    observations: [],
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
@@ -371,13 +450,11 @@ const sendText = async () => {
   if (!textDraft.value.trim()) return;
   await ensureOngoingVisit();
   const taskId = await ensureTask();
-  await db.task_items.add({
-    id: makeId(),
-    task_id: taskId,
-    type: "text",
-    text: textDraft.value.trim(),
-    image_blob: null,
-    created_at: nowIso(),
+  const task = await db.tasks.get(taskId);
+  const nextObservations = [...(task?.observations ?? []), textDraft.value.trim()];
+  await db.tasks.update(taskId, {
+    observations: nextObservations,
+    updated_at: nowIso(),
   });
   closeTextSheet();
 };
@@ -407,14 +484,20 @@ const sendImage = async () => {
   if (!imageFile.value) return;
   await ensureOngoingVisit();
   const taskId = await ensureTask();
-  await db.task_items.add({
-    id: makeId(),
+  const timestamp = nowIso();
+  const photoId = makeId();
+  await db.task_photos.add({
+    id: photoId,
     task_id: taskId,
-    type: "image",
-    text: null,
+    url: null,
     image_blob: imageFile.value,
-    created_at: nowIso(),
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
   });
+  const task = await db.tasks.get(taskId);
+  const nextPhotoIds = [...(task?.photo_ids ?? []), photoId];
+  await db.tasks.update(taskId, { photo_ids: nextPhotoIds, updated_at: timestamp });
   closeImageSheet();
 };
 
@@ -436,6 +519,7 @@ onBeforeUnmount(() => {
   taskItemViews.value.forEach((item) => {
     if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
   });
+  revokePhotoUrls(photoPreviewUrls.value);
   revokePreview();
   taskItemsSubscription?.unsubscribe();
 });
@@ -593,6 +677,26 @@ onBeforeUnmount(() => {
 
 .notes-item-image {
   width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.notes-observation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.notes-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
   border-radius: 12px;
   display: block;
 }
