@@ -12,7 +12,6 @@ export async function syncNow() {
     "tasks",
     "visits",
     "task_photos",
-    "visit_photos",
     "intervenants",
     "categories",
   ] as const;

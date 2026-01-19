@@ -29,6 +29,7 @@ export interface Visit {
   project_id: string;
   date: string;
   comment: string;
+  conclusion?: string | null;
   visit_number?: number;
   ended_at?: string | null;
   created_at: string;
@@ -41,15 +42,6 @@ export interface TaskPhoto {
   task_id: string;
   url?: string | null;
   image_blob?: Blob | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-}
-
-export interface VisitPhoto {
-  id: string;
-  visit_id: string;
-  url: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;

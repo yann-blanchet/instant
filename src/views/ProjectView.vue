@@ -126,7 +126,7 @@
               type="button"
               @click.stop.prevent="toggleTaskStatus(task)"
             >
-              {{ task.status === "done" ? "Done" : "Open" }}
+              {{ task.status === "done" ? "Mark as open" : "Mark as done" }}
             </button>
             <button
               class="notes-delete"
@@ -375,6 +375,7 @@ const startVisit = async () => {
     project_id: props.id,
     date: todayIso(),
     comment: "",
+    conclusion: "",
     visit_number: visitNumber,
     ended_at: null,
     created_at: timestamp,

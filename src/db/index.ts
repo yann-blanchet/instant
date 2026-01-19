@@ -4,7 +4,6 @@ import type {
   Task,
   Visit,
   TaskPhoto,
-  VisitPhoto,
   Intervenant,
   Category,
 } from "./types";
@@ -14,7 +13,6 @@ export class AppDB extends Dexie {
   tasks!: Table<Task, string>;
   visits!: Table<Visit, string>;
   task_photos!: Table<TaskPhoto, string>;
-  visit_photos!: Table<VisitPhoto, string>;
   intervenants!: Table<Intervenant, string>;
   categories!: Table<Category, string>;
 
@@ -35,7 +33,14 @@ export class AppDB extends Dexie {
       tasks: "id, project_id, status, updated_at, deleted_at",
       visits: "id, project_id, date, ended_at, updated_at, deleted_at",
       task_photos: "id, task_id, updated_at, deleted_at",
-      visit_photos: "id, visit_id, updated_at, deleted_at",
+      intervenants: "id, name, updated_at, deleted_at",
+      categories: "id, name, updated_at, deleted_at",
+    };
+    const schemaV7 = {
+      projects: "id, name, updated_at, deleted_at",
+      tasks: "id, project_id, status, updated_at, deleted_at",
+      visits: "id, project_id, date, ended_at, updated_at, deleted_at",
+      task_photos: "id, task_id, updated_at, deleted_at",
       intervenants: "id, name, updated_at, deleted_at",
       categories: "id, name, updated_at, deleted_at",
     };
@@ -80,6 +85,8 @@ export class AppDB extends Dexie {
         }
       });
     this.version(6).stores(schemaV6);
+    this.version(7).stores(schemaV7);
+    this.version(8).stores(schemaV7);
   }
 }
 

@@ -30,33 +30,19 @@
     </div>
 
     <div v-else class="notes-stack">
-      <div class="notes-section-label">Details</div>
       <div class="notes-list notes-form">
         <label class="notes-field">
           <span class="notes-label">Date</span>
           <input v-model="draft.date" type="date" class="notes-input" />
         </label>
         <label class="notes-field">
-          <span class="notes-label">General comment</span>
+          <span class="notes-label">Observations générales</span>
           <textarea v-model="draft.comment" class="notes-textarea" rows="4" />
         </label>
-      </div>
-
-      <div class="notes-section-label">Photos</div>
-      <div class="notes-list notes-form">
         <label class="notes-field">
-          <span class="notes-label">Add Photo URL</span>
-          <div class="notes-row-inline">
-            <input v-model="photoUrl" class="notes-input" />
-            <button class="notes-button" type="button" @click="addPhoto">Add</button>
-          </div>
+          <span class="notes-label">Conclusion</span>
+          <textarea v-model="draft.conclusion" class="notes-textarea" rows="3" />
         </label>
-        <div class="notes-chip-row">
-          <span v-if="photos.length === 0" class="notes-row-empty">No photos yet.</span>
-          <span v-for="photo in photos" :key="photo.id" class="notes-chip">
-            {{ photo.url }}
-          </span>
-        </div>
       </div>
 
     </div>
@@ -78,7 +64,7 @@ import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { formatVisitNumber } from "../utils/format";
-import { makeId, nowIso } from "../utils/time";
+import { nowIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -90,10 +76,6 @@ const project = useLiveQuery(
     return db.projects.get(visit.value.project_id);
   },
   null,
-);
-const photos = useLiveQuery(
-  () => db.visit_photos.filter((photo) => photo.visit_id === props.id).toArray(),
-  [],
 );
 const openObservations = useLiveQuery(
   async () => {
@@ -114,9 +96,9 @@ const openObservations = useLiveQuery(
 const draft = reactive({
   date: "",
   comment: "",
+  conclusion: "",
 });
 
-const photoUrl = ref("");
 
 watch(
   visit,
@@ -124,6 +106,7 @@ watch(
     if (!value) return;
     draft.date = value.date;
     draft.comment = value.comment ?? "";
+    draft.conclusion = value.conclusion ?? "";
   },
   { immediate: true },
 );
@@ -133,6 +116,7 @@ const save = async () => {
   await db.visits.update(visit.value.id, {
     date: draft.date,
     comment: draft.comment,
+    conclusion: draft.conclusion,
     updated_at: nowIso(),
   });
   handleBack();
@@ -150,18 +134,6 @@ const endVisit = async () => {
   });
 };
 
-const addPhoto = async () => {
-  if (!photoUrl.value.trim()) return;
-  await db.visit_photos.add({
-    id: makeId(),
-    visit_id: props.id,
-    url: photoUrl.value.trim(),
-    created_at: nowIso(),
-    updated_at: nowIso(),
-    deleted_at: null,
-  });
-  photoUrl.value = "";
-};
 
 const exportVisitPdf = () => {
   if (!visit.value) return;
@@ -333,6 +305,7 @@ const exportVisitPdf = () => {
   flex-direction: column;
   gap: 12px;
 }
+
 
 .notes-row {
   display: flex;
