@@ -77,8 +77,28 @@
     </div>
 
     <div class="notes-bottom-bar">
-      <button class="notes-bottom-cancel" type="button" @click="handleBack">Cancel</button>
-      <button class="notes-bottom-save" type="button" @click="sendAndBack">Save</button>
+      <button class="notes-bottom-icon" type="button" @click="openTextSheet" aria-label="Add text">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+      </button>
+      <button class="notes-bottom-icon" type="button" @click="openImagePicker" aria-label="Add image">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+      </button>
+      <button class="notes-bottom-icon notes-bottom-send" type="button" @click="sendAndBack" aria-label="Send">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
       <input
         ref="imageInput"
         type="file"
@@ -937,29 +957,41 @@ onBeforeUnmount(() => {
   border-top: none;
   padding: 12px 20px;
   display: flex;
-  gap: 12px;
-  justify-content: space-between;
+  justify-content: space-around;
+  align-items: center;
 }
 
-.notes-bottom-cancel,
-.notes-bottom-save {
-  flex: 1;
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.notes-bottom-cancel {
-  border: 1px solid var(--notes-border);
+.notes-bottom-icon {
+  width: 44px;
+  height: 44px;
+  border: none;
   background: transparent;
   color: var(--notes-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  flex: 1;
+  max-width: 44px;
 }
 
-.notes-bottom-save {
-  border: 2px solid var(--notes-accent);
-  background: #000;
+.notes-bottom-icon:hover {
+  background: var(--notes-hover);
+}
+
+.notes-bottom-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.notes-bottom-send {
   color: var(--notes-accent);
+}
+
+.notes-bottom-send svg {
+  width: 24px;
+  height: 24px;
 }
 
 .notes-bottom-btn {

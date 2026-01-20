@@ -65,7 +65,7 @@
           type="button"
           @click="activeTaskTab = 'unassigned'"
         >
-          Unassigned
+          Générale
           <span class="notes-badge-count">{{ taskGroups.unassigned.length }}</span>
         </button>
       </div>
@@ -135,6 +135,13 @@
             </span>
           </div>
           <div class="notes-task-actions">
+            <button
+              class="notes-assign"
+              type="button"
+              @click.stop.prevent="openAssignSheet(task)"
+            >
+              Assign
+            </button>
             <button
               class="notes-status"
               type="button"
@@ -247,6 +254,41 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="isAssignSheetOpen"
+      class="notes-sheet-backdrop"
+      @click="closeAssignSheet"
+    >
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-sheet-title">Assign task</div>
+        <div class="notes-list">
+          <button
+            class="notes-sheet-row"
+            type="button"
+            :class="{ active: !assigningTask?.intervenant_id }"
+            @click="assignTaskToIntervenant(null)"
+          >
+            Générale
+          </button>
+          <button
+            v-for="intervenant in projectIntervenantsList"
+            :key="intervenant.id"
+            class="notes-sheet-row"
+            :class="{ active: assigningTask?.intervenant_id === intervenant.id }"
+            type="button"
+            @click="assignTaskToIntervenant(intervenant.id)"
+          >
+            {{ intervenant.name }}
+          </button>
+        </div>
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeAssignSheet">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -268,6 +310,8 @@ const activeTaskTab = ref<"open" | "done" | "unassigned">("open");
 const isActionsSheetOpen = ref(false);
 const isEditProjectSheetOpen = ref(false);
 const isProjectIntervenantsSheetOpen = ref(false);
+const isAssignSheetOpen = ref(false);
+const assigningTask = ref<Task | null>(null);
 const isImageModalOpen = ref(false);
 const selectedImageUrl = ref<string | null>(null);
 const projectIntervenantIds = ref<string[]>([]);
@@ -326,6 +370,34 @@ const getTaskAssignee = (task: Task) => {
   return intervenants.value.find((i) => i.id === task.intervenant_id) ?? null;
 };
 
+const projectIntervenantsList = computed(() => {
+  if (!project.value?.intervenant_ids || project.value.intervenant_ids.length === 0) {
+    return [];
+  }
+  return intervenants.value.filter((intervenant) =>
+    project.value?.intervenant_ids?.includes(intervenant.id)
+  );
+});
+
+const openAssignSheet = (task: Task) => {
+  assigningTask.value = task;
+  isAssignSheetOpen.value = true;
+};
+
+const closeAssignSheet = () => {
+  isAssignSheetOpen.value = false;
+  assigningTask.value = null;
+};
+
+const assignTaskToIntervenant = async (intervenantId: string | null) => {
+  if (!assigningTask.value) return;
+  await db.tasks.update(assigningTask.value.id, {
+    intervenant_id: intervenantId,
+    updated_at: nowIso(),
+  });
+  closeAssignSheet();
+};
+
 
 const taskGroups = computed(() => {
   const grouped = {
@@ -351,7 +423,7 @@ const activeTaskGroup = computed(() => {
   const labelMap: Record<"open" | "done" | "unassigned", string> = {
     open: "Open",
     done: "Done",
-    unassigned: "Unassigned",
+    unassigned: "Générale",
   };
   return { label: labelMap[activeTaskTab.value], items };
 });
@@ -676,6 +748,11 @@ const deleteTask = async (task: Task) => {
   font-weight: 600;
 }
 
+.notes-sheet-row.active {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+}
+
 .notes-sheet-cancel {
   background: transparent;
   color: var(--notes-accent);
@@ -894,6 +971,20 @@ const deleteTask = async (task: Task) => {
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
+}
+
+.notes-assign {
+  border: none;
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.notes-assign:hover {
+  background: var(--notes-hover);
 }
 
 .notes-status {

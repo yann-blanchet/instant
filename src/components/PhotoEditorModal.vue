@@ -121,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   Group,
   Image as KImage,
@@ -198,10 +198,17 @@ const groupConfig = computed(() => ({
 const emitClose = () => emit("close");
 
 const loadImage = (src: string) => {
+  if (!src) return;
   const img = new Image();
+  img.crossOrigin = "anonymous";
   img.onload = () => {
     imageElement.value = img;
-    fitImageToStage();
+    nextTick(() => {
+      fitImageToStage();
+    });
+  };
+  img.onerror = (error) => {
+    console.error("Failed to load image:", error, src);
   };
   img.src = src;
 };
@@ -396,7 +403,12 @@ const sendImage = () => {
 watch(
   () => props.imageField.value,
   (value) => {
-    if (value) loadImage(value);
+    if (value && props.isActive) {
+      nextTick(() => {
+        updateStageSize();
+        loadImage(value);
+      });
+    }
   },
   { immediate: true },
 );
@@ -417,7 +429,17 @@ watch(
       texts.value = [];
       selectedTextId.value = null;
       tool.value = "draw";
-      onResize();
+      // Reload image when modal opens
+      if (props.imageField.value) {
+        nextTick(() => {
+          updateStageSize();
+          loadImage(props.imageField.value);
+        });
+      } else {
+        nextTick(() => {
+          updateStageSize();
+        });
+      }
     }
   },
 );
