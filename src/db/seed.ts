@@ -16,6 +16,7 @@ export async function seedIfEmpty() {
     id: makeId(),
     name: "Riverside Loft",
     address: "12 Rue des Arches, Lyon",
+    intervenant_ids: [intervenant.id],
     created_at,
     updated_at: created_at,
     deleted_at: null,

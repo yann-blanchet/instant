@@ -117,6 +117,7 @@ const saveCreateProject = async (payload: { name: string; address: string }) => 
     id: makeId(),
     name,
     address,
+    intervenant_ids: [],
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,

@@ -21,16 +21,10 @@
     </header>
 
     <div v-if="ongoingVisit" class="notes-list">
-      <router-link class="notes-row" :to="`/visits/${ongoingVisit.id}`">
+      <router-link class="notes-row notes-visit-row" :to="`/visits/${ongoingVisit.id}`">
         <div class="notes-row-left">
-          <span class="notes-folder">📁</span>
-          <div class="notes-row-text">
           <div class="notes-row-title">
-            Visite {{ formatVisitNumber(ongoingVisit.visit_number) }}
-          </div>
-          <div class="notes-row-subtitle">
-            {{ ongoingVisit.date }} · {{ ongoingVisit.comment || "Visite en cours" }}
-          </div>
+            Visite {{ formatVisitNumber(ongoingVisit.visit_number) }} · {{ formatDate(ongoingVisit.date) }}
           </div>
         </div>
         <div class="notes-row-right">
@@ -120,6 +114,9 @@
         <div class="notes-task-footer">
           <div class="notes-row-meta">
             <div>{{ formatRelativeTime(task.updated_at) }}</div>
+            <div v-if="getTaskAssignee(task)" class="notes-assignee-meta">
+              {{ getTaskAssignee(task)?.name }}
+            </div>
             <div v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
               <span v-if="task.opened_visit_id">
                 Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
@@ -174,6 +171,9 @@
         <button class="notes-sheet-row" type="button" @click="openEditProject">
           Edit project
         </button>
+        <button class="notes-sheet-row" type="button" @click="openProjectIntervenants">
+          Intervenants
+        </button>
         <button class="notes-sheet-row" type="button" @click="handleExportReport">
           Export report (PDF)
         </button>
@@ -198,6 +198,47 @@
       @close="closeEditProject"
       @save="saveEditProject"
     />
+
+    <div
+      v-if="isProjectIntervenantsSheetOpen"
+      class="notes-sheet-backdrop"
+      @click="closeProjectIntervenants"
+    >
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-sheet-title">Project intervenants</div>
+        <div class="notes-list notes-form">
+          <div class="notes-field">
+            <span class="notes-label">Intervenants</span>
+            <div class="notes-category-badges">
+              <button
+                v-for="intervenant in intervenants"
+                :key="intervenant.id"
+                class="notes-category-badge"
+                :class="{
+                  active: projectIntervenantIds.includes(intervenant.id),
+                }"
+                type="button"
+                @click="toggleProjectIntervenant(intervenant.id)"
+              >
+                {{ intervenant.name }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeProjectIntervenants">
+            Cancel
+          </button>
+          <button
+            class="notes-button notes-button-primary"
+            type="button"
+            @click="saveProjectIntervenants"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -209,8 +250,8 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
-import type { Task, TaskPhoto } from "../db/types";
-import { formatRelativeTime, formatVisitNumber } from "../utils/format";
+import type { Intervenant, Task, TaskPhoto } from "../db/types";
+import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();
@@ -218,8 +259,10 @@ const router = useRouter();
 const activeTaskTab = ref<"open" | "done">("open");
 const isActionsSheetOpen = ref(false);
 const isEditProjectSheetOpen = ref(false);
+const isProjectIntervenantsSheetOpen = ref(false);
 const isImageModalOpen = ref(false);
 const selectedImageUrl = ref<string | null>(null);
+const projectIntervenantIds = ref<string[]>([]);
 
 
 const project = useLiveQuery(
@@ -256,6 +299,8 @@ const visits = useLiveQuery(
   [],
 );
 
+const intervenants = useLiveQuery(() => db.intervenants.toArray(), [] as Intervenant[]);
+
 const ongoingVisit = computed(
   () => visits.value.find((visit) => !visit.ended_at) ?? null,
 );
@@ -267,6 +312,11 @@ const visitNumberMap = computed(() => {
   });
   return map;
 });
+
+const getTaskAssignee = (task: Task) => {
+  if (!task.intervenant_id) return null;
+  return intervenants.value.find((i) => i.id === task.intervenant_id) ?? null;
+};
 
 
 const taskGroups = computed(() => {
@@ -377,6 +427,35 @@ const saveEditProject = async (payload: { name: string; address: string }) => {
     updated_at: nowIso(),
   });
   isEditProjectSheetOpen.value = false;
+};
+
+const openProjectIntervenants = () => {
+  isActionsSheetOpen.value = false;
+  projectIntervenantIds.value = [...(project.value?.intervenant_ids || [])];
+  isProjectIntervenantsSheetOpen.value = true;
+};
+
+const closeProjectIntervenants = () => {
+  isProjectIntervenantsSheetOpen.value = false;
+  projectIntervenantIds.value = [];
+};
+
+const toggleProjectIntervenant = (intervenantId: string) => {
+  const index = projectIntervenantIds.value.indexOf(intervenantId);
+  if (index >= 0) {
+    projectIntervenantIds.value.splice(index, 1);
+  } else {
+    projectIntervenantIds.value.push(intervenantId);
+  }
+};
+
+const saveProjectIntervenants = async () => {
+  if (!project.value) return;
+  await db.projects.update(project.value.id, {
+    intervenant_ids: [...projectIntervenantIds.value],
+    updated_at: nowIso(),
+  });
+  closeProjectIntervenants();
 };
 
 const startVisit = async () => {
@@ -617,6 +696,14 @@ const deleteTask = async (task: Task) => {
   align-items: stretch;
 }
 
+.notes-visit-row {
+  padding: 10px 16px;
+}
+
+.notes-visit-row .notes-row-left {
+  gap: 0;
+}
+
 .notes-row + .notes-row {
   border-top: 1px solid var(--notes-border);
 }
@@ -667,6 +754,13 @@ const deleteTask = async (task: Task) => {
 .notes-row-meta {
   font-size: 11px;
   color: var(--notes-muted);
+}
+
+.notes-assignee-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--notes-text);
+  font-weight: 500;
 }
 
 .notes-visit-meta {
@@ -835,5 +929,52 @@ const deleteTask = async (task: Task) => {
   background: var(--notes-accent);
   color: var(--notes-accent-contrast);
   font-weight: 600;
+}
+
+.notes-category-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.notes-category-badge {
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border: 1px solid var(--notes-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.notes-category-badge.active {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+  border-color: var(--notes-accent);
+}
+
+.notes-sheet-title {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 16px 16px 8px;
+}
+
+.notes-sheet-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 16px;
+}
+
+.notes-sheet-actions .notes-button {
+  flex: 1;
+}
+
+.notes-sheet-actions .notes-button-primary {
+  border: 2px solid var(--notes-accent);
+  background: #000;
+  color: var(--notes-accent);
 }
 </style>

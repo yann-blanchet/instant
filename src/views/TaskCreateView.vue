@@ -163,8 +163,14 @@
         >
           Unassigned
         </button>
+        <div v-if="projectIntervenants.length === 0 && project?.intervenant_ids && project.intervenant_ids.length > 0" class="notes-sheet-row notes-sheet-empty">
+          No matching intervenants found (IDs may be invalid)
+        </div>
+        <div v-else-if="projectIntervenants.length === 0" class="notes-sheet-row notes-sheet-empty">
+          No intervenants assigned to this project
+        </div>
         <button
-          v-for="person in intervenants"
+          v-for="person in projectIntervenants"
           :key="person.id"
           class="notes-sheet-row"
           type="button"
@@ -212,6 +218,9 @@ const editingTaskId = computed(() => {
   return typeof id === "string" && id.length > 0 ? id : null;
 });
 
+// Initialize taskRecord early so projectId can reference it
+const taskRecord = ref<Task | null>(null);
+
 const projectId = computed(() => {
   const id = route.params.id;
   if (typeof id === "string" && id.length > 0) return id;
@@ -220,16 +229,91 @@ const projectId = computed(() => {
   return taskRecord.value?.project_id ?? null;
 });
 
-const project = useLiveQuery(
-  () => {
-    if (!projectId.value) return null;
-    return db.projects.get(projectId.value);
-  },
-  null,
-);
+// Watch projectId to ensure reactivity and recreate query when it changes
+const project = ref<Awaited<ReturnType<typeof db.projects.get>> | null>(null);
+let projectSubscription: Subscription | null = null;
+
+const updateProjectQuery = () => {
+  // Unsubscribe from previous query
+  if (projectSubscription) {
+    projectSubscription.unsubscribe();
+  }
+  
+  const pid = projectId.value;
+  console.log("[TaskCreateView] updateProjectQuery called with projectId:", pid);
+  
+  if (!pid) {
+    project.value = null;
+    return;
+  }
+  
+  // Create new subscription
+  projectSubscription = liveQuery(() => db.projects.get(pid)).subscribe({
+    next: (value) => {
+      console.log("[TaskCreateView] project.value updated:", value);
+      project.value = value;
+    },
+    error: (error) => {
+      console.error("[TaskCreateView] Project query error:", error);
+    },
+  });
+};
+
+// Watch projectId and update query when it changes
+watch(projectId, updateProjectQuery, { immediate: true });
+
+// Watch project changes
+watch(project, (p) => {
+  console.log("[TaskCreateView] project.value changed:", p);
+}, { immediate: true, deep: true });
+
+onBeforeUnmount(() => {
+  if (projectSubscription) {
+    projectSubscription.unsubscribe();
+  }
+});
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 const isAssigneeSheetOpen = ref(false);
+
+// Force refresh project when assignee sheet opens
+watch(isAssigneeSheetOpen, async (isOpen) => {
+  if (isOpen && projectId.value) {
+    // Force a refresh by re-querying the project
+    const freshProject = await db.projects.get(projectId.value);
+    console.log("[TaskCreateView] Fresh project from DB when sheet opens:", freshProject);
+    console.log("[TaskCreateView] Current project.value:", project.value);
+  }
+});
+
+const projectIntervenants = computed(() => {
+  if (!project.value) {
+    console.log("[TaskCreateView] projectIntervenants: no project.value");
+    return [];
+  }
+  const projectIntervenantIds = project.value.intervenant_ids;
+  console.log("[TaskCreateView] projectIntervenants: project.value =", project.value);
+  console.log("[TaskCreateView] projectIntervenants: projectIntervenantIds =", projectIntervenantIds);
+  console.log("[TaskCreateView] projectIntervenants: intervenants.value =", intervenants.value);
+  if (!projectIntervenantIds || !Array.isArray(projectIntervenantIds) || projectIntervenantIds.length === 0) {
+    console.log("[TaskCreateView] projectIntervenants: no projectIntervenantIds or empty array");
+    return [];
+  }
+  if (!intervenants.value || !Array.isArray(intervenants.value) || intervenants.value.length === 0) {
+    console.log("[TaskCreateView] projectIntervenants: no intervenants.value or empty array");
+    return [];
+  }
+  const filtered = intervenants.value.filter((intervenant) =>
+    projectIntervenantIds.includes(intervenant.id)
+  );
+  console.log("[TaskCreateView] projectIntervenants: filtered result =", filtered);
+  console.log("[TaskCreateView] projectIntervenants: checking IDs", {
+    projectIds: projectIntervenantIds,
+    intervenantIds: intervenants.value.map(i => i.id),
+    matches: intervenants.value.map(i => ({ id: i.id, name: i.name, included: projectIntervenantIds.includes(i.id) }))
+  });
+  return filtered;
+});
 const headerTitle = computed(() => "Nouvelle observation");
 
 const form = reactive<{
@@ -252,7 +336,6 @@ const selectAssignee = (id: string | null) => {
 };
 
 const createdTaskId = ref<string | null>(null);
-const taskRecord = ref<Task | null>(null);
 const taskPhotos = ref<TaskPhoto[]>([]);
 let taskItemsSubscription: Subscription | null = null;
 const taskItemViews = ref<
@@ -975,5 +1058,37 @@ onBeforeUnmount(() => {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.notes-sheet-row {
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  text-align: left;
+  width: 100%;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.notes-sheet-row:hover {
+  background: var(--notes-hover);
+}
+
+.notes-sheet-row-empty {
+  color: var(--notes-muted);
+  cursor: default;
+  font-style: italic;
+}
+
+.notes-sheet-row-empty:hover {
+  background: var(--notes-panel-strong);
+}
+
+.notes-sheet-cancel {
+  margin-top: 8px;
+  border-top: 1px solid var(--notes-border);
+  padding-top: 14px;
 }
 </style>

@@ -4,6 +4,7 @@ export interface Project {
   id: string;
   name: string;
   address: string;
+  intervenant_ids?: string[];
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
