@@ -35,14 +35,14 @@
           <div class="notes-assignee-header">
             <span class="notes-assignee-header-name">{{ group.assigneeName }}</span>
             <div v-if="group.assigneeCategories.length > 0" class="notes-assignee-header-badges">
-              <span
-                v-for="category in group.assigneeCategories"
-                :key="category.id"
-                class="notes-assignee-header-badge"
-                :style="category.color ? { borderLeft: `3px solid ${category.color}` } : {}"
-              >
-                {{ category.name }}
-              </span>
+                <span
+                  v-for="category in group.assigneeCategories"
+                  :key="category.id"
+                  class="notes-assignee-header-badge"
+                  :style="category.color ? { borderColor: category.color } : {}"
+                >
+                  {{ category.name }}
+                </span>
             </div>
           </div>
           <div
@@ -90,12 +90,6 @@
               </div>
             </div>
             <div class="notes-task-right">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-              </div>
               <button
                 class="notes-task-menu"
                 type="button"
@@ -104,6 +98,32 @@
               >
                 ⋯
               </button>
+              <div class="notes-task-right-content">
+                <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
+                  <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
+                    <span
+                      v-for="category in getIntervenantCategories(getTaskAssignee(task))"
+                      :key="category.id"
+                      class="notes-task-category-badge"
+                      :style="category.color ? { borderColor: category.color } : {}"
+                    >
+                      {{ category.name }}
+                    </span>
+                  </template>
+                  <span
+                    v-else-if="!getTaskAssignee(task)"
+                    class="notes-task-category-badge"
+                  >
+                    Générale
+                  </span>
+                </div>
+                <div class="notes-row-meta">
+                  <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
+                    {{ getTaskAssignee(task)?.name }}
+                  </span>
+                  <span>{{ formatRelativeTime(task.updated_at) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -165,12 +185,6 @@
               </div>
             </div>
             <div class="notes-task-right">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-              </div>
               <button
                 class="notes-task-menu"
                 type="button"
@@ -179,6 +193,32 @@
               >
                 ⋯
               </button>
+              <div class="notes-task-right-content">
+                <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
+                  <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
+                    <span
+                      v-for="category in getIntervenantCategories(getTaskAssignee(task))"
+                      :key="category.id"
+                      class="notes-task-category-badge"
+                      :style="category.color ? { borderColor: category.color } : {}"
+                    >
+                      {{ category.name }}
+                    </span>
+                  </template>
+                  <span
+                    v-else-if="!getTaskAssignee(task)"
+                    class="notes-task-category-badge"
+                  >
+                    Générale
+                  </span>
+                </div>
+                <div class="notes-row-meta">
+                  <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
+                    {{ getTaskAssignee(task)?.name }}
+                  </span>
+                  <span>{{ formatRelativeTime(task.updated_at) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -229,12 +269,6 @@
             </div>
           </div>
           <div class="notes-task-right">
-            <div class="notes-row-meta">
-              <span>{{ formatRelativeTime(task.updated_at) }}</span>
-              <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                · {{ getTaskAssignee(task)?.name }}
-              </span>
-            </div>
             <button
               class="notes-task-menu"
               type="button"
@@ -243,6 +277,32 @@
             >
               ⋯
             </button>
+            <div class="notes-task-right-content">
+              <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
+                <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
+                  <span
+                    v-for="category in getIntervenantCategories(getTaskAssignee(task))"
+                    :key="category.id"
+                    class="notes-task-category-badge"
+                    :style="category.color ? { borderColor: category.color } : {}"
+                  >
+                    {{ category.name }}
+                  </span>
+                </template>
+                <span
+                  v-else-if="!getTaskAssignee(task)"
+                  class="notes-task-category-badge"
+                >
+                  Générale
+                </span>
+              </div>
+              <div class="notes-row-meta">
+                <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
+                  {{ getTaskAssignee(task)?.name }}
+                </span>
+                <span>{{ formatRelativeTime(task.updated_at) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -399,6 +459,7 @@ const groupedTasksByVisit = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 12px;
 }
 
 .notes-section-label {
@@ -486,17 +547,44 @@ const groupedTasksByVisit = computed(() => {
 }
 
 .notes-task-row {
-  align-items: flex-start;
+  align-items: stretch;
   gap: 12px;
+  min-height: 60px;
 }
 
 .notes-task-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: space-between;
   gap: 8px;
   flex-shrink: 0;
   min-width: 100px;
+  align-self: stretch;
+}
+
+.notes-task-right-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.notes-task-category-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.notes-task-category-badge {
+  background: transparent;
+  color: var(--notes-text);
+  border: 1px solid var(--notes-border);
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .notes-row-text {
@@ -514,9 +602,9 @@ const groupedTasksByVisit = computed(() => {
 
 .notes-row-meta {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   font-size: 11px;
   color: var(--notes-muted);
 }
@@ -603,8 +691,9 @@ const groupedTasksByVisit = computed(() => {
 }
 
 .notes-assignee-header-badge {
-  background: var(--notes-chip);
+  background: transparent;
   color: var(--notes-text);
+  border: 1px solid var(--notes-border);
   border-radius: 999px;
   padding: 4px 8px;
   font-size: 11px;
