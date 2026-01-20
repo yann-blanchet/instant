@@ -29,20 +29,18 @@
       <template v-if="filterMode === 'assignee' && groupedTasksByAssignee">
         <div
           v-for="group in groupedTasksByAssignee"
-          :key="group.assigneeId || '__unassigned__'"
+          :key="group.assigneeId || UNASSIGNED_ID"
           class="notes-assignee-group"
         >
           <div class="notes-assignee-header">
             <span class="notes-assignee-header-name">{{ group.assigneeName }}</span>
             <div v-if="group.assigneeCategories.length > 0" class="notes-assignee-header-badges">
-                <span
+                <CategoryBadge
                   v-for="category in group.assigneeCategories"
                   :key="category.id"
-                  class="notes-assignee-header-badge"
-                  :style="category.color ? { borderColor: category.color } : {}"
-                >
-                  {{ category.name }}
-                </span>
+                  :category="category"
+                  variant="header"
+                />
             </div>
           </div>
           <div
@@ -101,21 +99,18 @@
               <div class="notes-task-right-content">
                 <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
                   <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-                    <span
+                    <CategoryBadge
                       v-for="category in getIntervenantCategories(getTaskAssignee(task))"
                       :key="category.id"
-                      class="notes-task-category-badge"
-                      :style="category.color ? { borderColor: category.color } : {}"
-                    >
-                      {{ category.name }}
-                    </span>
+                      :category="category"
+                      variant="task"
+                    />
                   </template>
-                  <span
+                  <CategoryBadge
                     v-else-if="!getTaskAssignee(task)"
-                    class="notes-task-category-badge"
-                  >
-                    Générale
-                  </span>
+                    :label="UNASSIGNED_LABEL"
+                    variant="task"
+                  />
                 </div>
                 <div class="notes-row-meta">
                   <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
@@ -196,21 +191,18 @@
               <div class="notes-task-right-content">
                 <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
                   <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-                    <span
+                    <CategoryBadge
                       v-for="category in getIntervenantCategories(getTaskAssignee(task))"
                       :key="category.id"
-                      class="notes-task-category-badge"
-                      :style="category.color ? { borderColor: category.color } : {}"
-                    >
-                      {{ category.name }}
-                    </span>
+                      :category="category"
+                      variant="task"
+                    />
                   </template>
-                  <span
+                  <CategoryBadge
                     v-else-if="!getTaskAssignee(task)"
-                    class="notes-task-category-badge"
-                  >
-                    Générale
-                  </span>
+                    :label="UNASSIGNED_LABEL"
+                    variant="task"
+                  />
                 </div>
                 <div class="notes-row-meta">
                   <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
@@ -293,7 +285,7 @@
                   v-else-if="!getTaskAssignee(task)"
                   class="notes-task-category-badge"
                 >
-                  Générale
+                  {{ UNASSIGNED_LABEL }}
                 </span>
               </div>
               <div class="notes-row-meta">
@@ -316,6 +308,7 @@ import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import type { Category, Intervenant, Task, TaskPhoto, Visit } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
+import CategoryBadge from "./CategoryBadge.vue";
 
 const props = defineProps<{
   projectId: string;
@@ -338,9 +331,27 @@ const emit = defineEmits<{
 
 const filterMode = ref<"assignee" | "date">("date");
 
-const getTaskAssignee = (task: Task) => {
+// Constants
+const UNASSIGNED_LABEL = "Générale";
+const UNASSIGNED_ID = "__unassigned__";
+
+// Helper functions
+const getTaskAssignee = (task: Task): Intervenant | null => {
   if (!task.intervenant_id) return null;
   return props.intervenants.find((i) => i.id === task.intervenant_id) ?? null;
+};
+
+const getAssigneeId = (task: Task): string | null => {
+  return task.intervenant_id || UNASSIGNED_ID;
+};
+
+const getAssigneeDisplayName = (task: Task): string => {
+  const assignee = getTaskAssignee(task);
+  return assignee?.name || UNASSIGNED_LABEL;
+};
+
+const isUnassigned = (assigneeId: string | null): boolean => {
+  return assigneeId === null || assigneeId === UNASSIGNED_ID;
 };
 
 const filteredTasks = computed(() => {
@@ -352,14 +363,15 @@ const sortedTasks = computed(() => {
   const tasks = [...filteredTasks.value];
   if (filterMode.value === "assignee") {
     return tasks.sort((a, b) => {
-      const aAssignee = getTaskAssignee(a)?.name || "";
-      const bAssignee = getTaskAssignee(b)?.name || "";
-      if (aAssignee === bAssignee) {
+      const aName = getAssigneeDisplayName(a);
+      const bName = getAssigneeDisplayName(b);
+      if (aName === bName) {
         return a.created_at.localeCompare(b.created_at);
       }
-      if (!aAssignee) return 1;
-      if (!bAssignee) return -1;
-      return aAssignee.localeCompare(bAssignee);
+      // Unassigned always goes last
+      if (aName === UNASSIGNED_LABEL) return 1;
+      if (bName === UNASSIGNED_LABEL) return -1;
+      return aName.localeCompare(bName);
     });
   } else {
     // By date (ascending)
@@ -378,10 +390,9 @@ const groupedTasksByAssignee = computed(() => {
   const groups: Array<{ assigneeName: string; assigneeId: string | null; assigneeCategories: Category[]; tasks: Task[] }> = [];
   const assigneeMap = new Map<string | null, Task[]>();
   
+  // Group tasks by assignee ID
   sortedTasks.value.forEach((task) => {
-    const assignee = getTaskAssignee(task);
-    const assigneeId = assignee?.id || null;
-    const assigneeName = assignee?.name || "Générale";
+    const assigneeId = getAssigneeId(task);
     
     if (!assigneeMap.has(assigneeId)) {
       assigneeMap.set(assigneeId, []);
@@ -389,21 +400,25 @@ const groupedTasksByAssignee = computed(() => {
     assigneeMap.get(assigneeId)!.push(task);
   });
   
-  // Convert to array and sort by assignee name
+  // Convert to array and create group objects
   assigneeMap.forEach((tasks, assigneeId) => {
-    const assignee: Intervenant | null = assigneeId ? props.intervenants.find(i => i.id === assigneeId) ?? null : null;
+    const assignee: Intervenant | null = isUnassigned(assigneeId) 
+      ? null 
+      : props.intervenants.find(i => i.id === assigneeId) ?? null;
+    const firstTask = tasks[0];
+    
     groups.push({
-      assigneeName: assignee?.name || "Générale",
-      assigneeId,
+      assigneeName: getAssigneeDisplayName(firstTask),
+      assigneeId: isUnassigned(assigneeId) ? null : assigneeId,
       assigneeCategories: getIntervenantCategories(assignee),
       tasks,
     });
   });
   
-  // Sort groups: Générale last, others alphabetically
+  // Sort groups: Unassigned last, others alphabetically
   return groups.sort((a, b) => {
-    if (a.assigneeName === "Générale") return 1;
-    if (b.assigneeName === "Générale") return -1;
+    if (a.assigneeName === UNASSIGNED_LABEL) return 1;
+    if (b.assigneeName === UNASSIGNED_LABEL) return -1;
     return a.assigneeName.localeCompare(b.assigneeName);
   });
 });
@@ -577,15 +592,6 @@ const groupedTasksByVisit = computed(() => {
   justify-content: flex-end;
 }
 
-.notes-task-category-badge {
-  background: transparent;
-  color: var(--notes-text);
-  border: 1px solid var(--notes-border);
-  border-radius: 999px;
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 500;
-}
 
 .notes-row-text {
   display: flex;
@@ -690,15 +696,6 @@ const groupedTasksByVisit = computed(() => {
   align-items: center;
 }
 
-.notes-assignee-header-badge {
-  background: transparent;
-  color: var(--notes-text);
-  border: 1px solid var(--notes-border);
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 500;
-}
 
 .notes-visit-group {
   margin-bottom: 16px;

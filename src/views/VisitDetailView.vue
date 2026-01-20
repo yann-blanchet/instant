@@ -36,10 +36,6 @@
           <input v-model="draft.date" type="date" class="notes-input" />
         </label>
         <label class="notes-field">
-          <span class="notes-label">Observations générales</span>
-          <textarea v-model="draft.comment" class="notes-textarea" rows="4" />
-        </label>
-        <label class="notes-field">
           <span class="notes-label">Conclusion</span>
           <textarea v-model="draft.conclusion" class="notes-textarea" rows="3" />
         </label>
@@ -95,7 +91,6 @@ const openObservations = useLiveQuery(
 
 const draft = reactive({
   date: "",
-  comment: "",
   conclusion: "",
 });
 
@@ -105,7 +100,6 @@ watch(
   (value) => {
     if (!value) return;
     draft.date = value.date;
-    draft.comment = value.comment ?? "";
     draft.conclusion = value.conclusion ?? "";
   },
   { immediate: true },
@@ -115,7 +109,6 @@ const save = async () => {
   if (!visit.value) return;
   await db.visits.update(visit.value.id, {
     date: draft.date,
-    comment: draft.comment,
     conclusion: draft.conclusion,
     updated_at: nowIso(),
   });

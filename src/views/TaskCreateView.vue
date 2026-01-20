@@ -589,7 +589,6 @@ const ensureOngoingVisit = async () => {
     id: visitId,
     project_id: projectId.value,
     date: new Date().toISOString().slice(0, 10),
-    comment: "",
     conclusion: "",
     visit_number: visitNumber,
     ended_at: null,

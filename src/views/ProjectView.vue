@@ -599,7 +599,6 @@ const startVisit = async () => {
     id: visitId,
     project_id: props.id,
     date: todayIso(),
-    comment: "",
     conclusion: "",
     visit_number: visitNumber,
     ended_at: null,

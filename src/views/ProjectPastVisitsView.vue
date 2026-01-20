@@ -29,7 +29,7 @@
             Visite {{ formatVisitNumber(visit.visit_number) }}
           </div>
           <div class="notes-row-subtitle">
-            {{ visit.date }} · {{ visit.comment || "Visite" }}
+            {{ visit.date }}
             <span v-if="visit.id === ongoingVisit?.id">· En cours</span>
           </div>
           </div>

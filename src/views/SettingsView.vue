@@ -89,14 +89,12 @@
                 <span v-if="person.phone" class="notes-intervenant-phone">{{ person.phone }}</span>
               </div>
               <div v-if="getIntervenantCategoryBadges(person).length > 0" class="notes-intervenant-badges">
-                <span
+                <CategoryBadge
                   v-for="category in getIntervenantCategoryBadges(person)"
                   :key="category.id"
-                  class="notes-intervenant-badge"
-                  :style="category.color ? { borderLeft: `3px solid ${category.color}` } : {}"
-                >
-                  {{ category.name }}
-                </span>
+                  :category="category"
+                  variant="header"
+                />
               </div>
             </div>
             <span class="notes-chevron">›</span>
@@ -152,17 +150,14 @@
             <div class="notes-field">
               <span class="notes-label">Categories</span>
               <div class="notes-category-badges">
-                <button
+                <CategoryBadge
                   v-for="category in categories"
                   :key="category.id"
-                  class="notes-category-badge"
-                  :class="{ active: intervenantCategories.includes(category.id) }"
-                  :style="category.color ? { borderColor: category.color } : {}"
-                  type="button"
+                  :category="category"
+                  :active="intervenantCategories.includes(category.id)"
+                  clickable
                   @click="toggleCategory(category.id)"
-                >
-                  {{ category.name }}
-                </button>
+                />
               </div>
             </div>
           </div>
@@ -284,6 +279,7 @@ import { db } from "../db";
 import type { Category, Intervenant } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 import { syncNow } from "../services/sync";
+import CategoryBadge from "../components/CategoryBadge.vue";
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 const categories = useLiveQuery(() => db.categories.toArray(), []);
@@ -707,13 +703,6 @@ const runSync = async () => {
   margin-top: 4px;
 }
 
-.notes-intervenant-badge {
-  background: var(--notes-chip);
-  color: var(--notes-text);
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 11px;
-}
 
 .notes-row-right {
   display: flex;
