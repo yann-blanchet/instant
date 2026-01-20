@@ -40,10 +40,9 @@
       </router-link>
     </div>
 
-    <div v-if="!ongoingVisit" class="notes-cta">
-      <button class="notes-button notes-button-primary" type="button" @click="startVisit">
-        Démarrer une visite
-      </button>
+    <div v-if="!ongoingVisit" class="notes-cta notes-cta-empty">
+      <div class="notes-row-title">Pas de visite en cours</div>
+      <div class="notes-row-subtitle">Ajouter une observation pour commencer la visite</div>
     </div>
 
     <div class="notes-section-header">
@@ -816,6 +815,11 @@ const deleteTask = async (task: Task) => {
 .notes-cta {
   display: flex;
   justify-content: flex-start;
+}
+
+.notes-cta-empty {
+  flex-direction: column;
+  gap: 6px;
 }
 
 .notes-button {

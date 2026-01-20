@@ -181,6 +181,15 @@
         </button>
       </div>
     </div>
+
+    <PhotoEditorModal
+      :is-active="isPhotoEditorOpen"
+      :image-field="{ value: photoEditorSource }"
+      :show-save="true"
+      @close="closePhotoEditor"
+      @update-image="handlePhotoUpdated"
+      @send-image="handlePhotoEdited"
+    />
   </section>
 </template>
 
@@ -193,6 +202,7 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import type { Task, TaskPhoto } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
+import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -254,8 +264,10 @@ const taskItemViews = ref<
 const photoPreviewUrls = ref<string[]>([]);
 const isTextSheetOpen = ref(false);
 const isImageSheetOpen = ref(false);
+const isPhotoEditorOpen = ref(false);
+const photoEditorSource = ref("");
 const textDraft = ref("");
-const imageFile = ref<File | null>(null);
+const imageFile = ref<File | Blob | null>(null);
 const imagePreviewUrl = ref<string | null>(null);
 const imageInput = ref<HTMLInputElement | null>(null);
 const textAreaRef = ref<HTMLTextAreaElement | null>(null);
@@ -506,10 +518,9 @@ const handleImagePicked = (event: Event) => {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  imageFile.value = file;
-  revokePreview();
-  imagePreviewUrl.value = URL.createObjectURL(file);
-  isImageSheetOpen.value = true;
+  photoEditorSource.value = URL.createObjectURL(file);
+  isPhotoEditorOpen.value = true;
+  isImageSheetOpen.value = false;
   input.value = "";
 };
 
@@ -517,6 +528,30 @@ const closeImageSheet = () => {
   isImageSheetOpen.value = false;
   imageFile.value = null;
   revokePreview();
+};
+
+const closePhotoEditor = () => {
+  if (photoEditorSource.value.startsWith("blob:")) {
+    URL.revokeObjectURL(photoEditorSource.value);
+  }
+  photoEditorSource.value = "";
+  isPhotoEditorOpen.value = false;
+};
+
+const handlePhotoUpdated = async (dataUrl: string) => {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  imageFile.value = blob;
+  revokePreview();
+  imagePreviewUrl.value = dataUrl;
+};
+
+const handlePhotoEdited = async (dataUrl: string) => {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  imageFile.value = blob;
+  closePhotoEditor();
+  await sendImage();
 };
 
 const sendImage = async () => {
