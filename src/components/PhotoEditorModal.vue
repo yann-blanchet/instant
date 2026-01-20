@@ -15,10 +15,18 @@
             @click="activeColor = color"
           />
         </div>
-        <label class="photo-editor-field">
-          <span>Size</span>
-          <input v-model.number="activeSize" type="range" min="4" max="36" />
-        </label>
+        <div class="photo-editor-sizes">
+          <button
+            v-for="size in brushSizes"
+            :key="size"
+            class="photo-editor-size"
+            :class="{ active: activeSize === size }"
+            type="button"
+            @click="activeSize = size"
+          >
+            <span :style="{ width: `${size}px`, height: `${size}px` }"></span>
+          </button>
+        </div>
         <button class="photo-editor-action" type="button" @click="clearDrawings">
           Clear drawings
         </button>
@@ -142,6 +150,7 @@ const transform = ref({ x: 0, y: 0, scale: 1 });
 const tool = ref<"draw" | "text" | "pan">("draw");
 const activeColor = ref("#000000");
 const palette = ["#000000", "#ffffff", "#ff6b6b", "#4dabf7", "#40c057"];
+const brushSizes = [6, 12, 20];
 const activeSize = ref(10);
 const isDrawing = ref(false);
 const lines = ref<
@@ -509,6 +518,34 @@ onBeforeUnmount(() => {
 }
 
 .photo-editor-color.active {
+  border-color: #f8c44c;
+}
+
+.photo-editor-sizes {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.photo-editor-size {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 2px solid #2c2c2e;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.photo-editor-size span {
+  display: block;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.photo-editor-size.active {
   border-color: #f8c44c;
 }
 
