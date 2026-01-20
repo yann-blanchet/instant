@@ -3,10 +3,6 @@
     <div class="modal-box notes-modal-box">
       <h3 class="notes-title">{{ title }}</h3>
       <form class="notes-form" @submit.prevent="save">
-        <label class="notes-field">
-          <span class="notes-label">Description</span>
-          <textarea v-model="form.description" class="notes-textarea" />
-        </label>
         <div class="notes-grid">
           <label class="notes-field">
             <span class="notes-label">Assignee</span>
@@ -61,11 +57,9 @@ const emit = defineEmits<{
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 
 const form = reactive<{
-  description: string;
   status: TaskStatus;
   intervenant_id: string | null;
 }>({
-  description: "",
   status: "open",
   intervenant_id: null,
 });
@@ -73,7 +67,6 @@ const form = reactive<{
 const photoUrl = ref("");
 
 const reset = () => {
-  form.description = "";
   form.status = "open";
   form.intervenant_id = null;
   photoUrl.value = "";
@@ -93,11 +86,13 @@ const save = async () => {
   await db.tasks.add({
     id: taskId,
     project_id: props.projectId ?? null,
-    description: form.description || null,
+    visit_id: null,
+    opened_visit_id: null,
+    done_visit_id: null,
     status: form.status,
     intervenant_id: form.intervenant_id,
-    audio_url: null,
     photo_ids: photoId ? [photoId] : [],
+    observations: [],
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,

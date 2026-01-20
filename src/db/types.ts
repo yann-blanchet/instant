@@ -52,7 +52,9 @@ export interface TaskPhoto {
 export interface Intervenant {
   id: string;
   name: string;
-  color: string;
+  email?: string | null;
+  phone?: string | null;
+  category_ids?: string[];
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -61,6 +63,7 @@ export interface Intervenant {
 export interface Category {
   id: string;
   name: string;
+  color?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
