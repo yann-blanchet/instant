@@ -46,13 +46,24 @@
 
     <div class="notes-section-header">
       <div class="notes-section-label">Open observations <span class="notes-count-badge">{{ sortedOpenTasks.length }}</span></div>
-      <button
-        class="notes-filter-swap-button"
-        type="button"
-        @click="toggleFilterMode"
-      >
-        {{ filterMode === "assignee" ? "By date" : "By assignee" }}
-      </button>
+      <div class="notes-filter-badges">
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'date' }"
+          type="button"
+          @click="filterMode = 'date'"
+        >
+          Date
+        </button>
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'assignee' }"
+          type="button"
+          @click="filterMode = 'assignee'"
+        >
+          Assignee
+        </button>
+      </div>
     </div>
 
     <div class="notes-list notes-task-list-container">
@@ -128,36 +139,15 @@
             <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
               · {{ getTaskAssignee(task)?.name }}
             </span>
-            <span v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
-              <span v-if="task.opened_visit_id">
-                · Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
-              </span>
-              <span v-if="task.done_visit_id">
-                · Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
-              </span>
-            </span>
           </div>
           <div class="notes-task-actions">
             <button
-              class="notes-assign"
+              class="notes-task-menu"
               type="button"
-              @click.stop.prevent="openAssignSheet(task)"
+              @click.stop.prevent="openTaskActionsSheet(task)"
+              aria-label="Task actions"
             >
-              Assign
-            </button>
-            <button
-              class="notes-status"
-              type="button"
-              @click.stop.prevent="toggleTaskStatus(task)"
-            >
-              {{ task.status === "done" ? "Mark as open" : "Mark as done" }}
-            </button>
-            <button
-              class="notes-delete"
-              type="button"
-              @click.stop.prevent="deleteTask(task)"
-            >
-              Delete
+              ⋯
             </button>
           </div>
         </div>
@@ -226,36 +216,15 @@
               <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
                 · {{ getTaskAssignee(task)?.name }}
               </span>
-              <span v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
-                <span v-if="task.opened_visit_id">
-                  · Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
-                </span>
-                <span v-if="task.done_visit_id">
-                  · Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
-                </span>
-              </span>
             </div>
             <div class="notes-task-actions">
               <button
-                class="notes-assign"
+                class="notes-task-menu"
                 type="button"
-                @click.stop.prevent="openAssignSheet(task)"
+                @click.stop.prevent="openTaskActionsSheet(task)"
+                aria-label="Task actions"
               >
-                Assign
-              </button>
-              <button
-                class="notes-status"
-                type="button"
-                @click.stop.prevent="toggleTaskStatus(task)"
-              >
-                {{ task.status === "done" ? "Mark as open" : "Mark as done" }}
-              </button>
-              <button
-                class="notes-delete"
-                type="button"
-                @click.stop.prevent="deleteTask(task)"
-              >
-                Delete
+                ⋯
               </button>
             </div>
           </div>
@@ -313,36 +282,15 @@
               <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
                 · {{ getTaskAssignee(task)?.name }}
               </span>
-              <span v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
-                <span v-if="task.opened_visit_id">
-                  · Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
-                </span>
-                <span v-if="task.done_visit_id">
-                  · Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
-                </span>
-              </span>
             </div>
             <div class="notes-task-actions">
               <button
-                class="notes-assign"
+                class="notes-task-menu"
                 type="button"
-                @click.stop.prevent="openAssignSheet(task)"
+                @click.stop.prevent="openTaskActionsSheet(task)"
+                aria-label="Task actions"
               >
-                Assign
-              </button>
-              <button
-                class="notes-status"
-                type="button"
-                @click.stop.prevent="toggleTaskStatus(task)"
-              >
-                {{ task.status === "done" ? "Mark as open" : "Mark as done" }}
-              </button>
-              <button
-                class="notes-delete"
-                type="button"
-                @click.stop.prevent="deleteTask(task)"
-              >
-                Delete
+                ⋯
               </button>
             </div>
           </div>
@@ -367,6 +315,58 @@
           <polyline points="21 15 16 10 5 21"></polyline>
         </svg>
       </button>
+    </div>
+
+    <div
+      v-if="isTaskActionsSheetOpen"
+      class="notes-sheet-backdrop"
+      @click="closeTaskActionsSheet"
+    >
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-sheet-title">Task actions</div>
+        <div class="notes-list">
+          <div class="notes-sheet-section-label">Assign</div>
+          <div class="notes-sheet-chips">
+            <button
+              class="notes-sheet-chip"
+              type="button"
+              :class="{ active: !taskActionsTask?.intervenant_id }"
+              @click="handleTaskActionAssignToIntervenant(null)"
+            >
+              Générale
+            </button>
+            <button
+              v-for="intervenant in projectIntervenantsList"
+              :key="intervenant.id"
+              class="notes-sheet-chip"
+              :class="{ active: taskActionsTask?.intervenant_id === intervenant.id }"
+              type="button"
+              @click="handleTaskActionAssignToIntervenant(intervenant.id)"
+            >
+              {{ intervenant.name }}
+            </button>
+          </div>
+        </div>
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeTaskActionsSheet">
+            Cancel
+          </button>
+          <button
+            class="notes-button"
+            type="button"
+            @click="handleTaskActionToggleStatus"
+          >
+            {{ taskActionsTask?.status === "done" ? "Mark as open" : "Mark as done" }}
+          </button>
+          <button
+            class="notes-button notes-button-danger"
+            type="button"
+            @click="handleTaskActionDelete"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
 
     <ImageModal
@@ -612,6 +612,8 @@ const isProjectIntervenantsSheetOpen = ref(false);
 const isDoneObservationsSheetOpen = ref(false);
 const isAssignSheetOpen = ref(false);
 const assigningTask = ref<Task | null>(null);
+const isTaskActionsSheetOpen = ref(false);
+const taskActionsTask = ref<Task | null>(null);
 const isImageModalOpen = ref(false);
 const selectedImageUrl = ref<string | null>(null);
 const projectIntervenantIds = ref<string[]>([]);
@@ -699,6 +701,37 @@ const assignTaskToIntervenant = async (intervenantId: string | null) => {
     updated_at: nowIso(),
   });
   closeAssignSheet();
+};
+
+const openTaskActionsSheet = (task: Task) => {
+  taskActionsTask.value = task;
+  isTaskActionsSheetOpen.value = true;
+};
+
+const closeTaskActionsSheet = () => {
+  isTaskActionsSheetOpen.value = false;
+  taskActionsTask.value = null;
+};
+
+const handleTaskActionAssignToIntervenant = async (intervenantId: string | null) => {
+  if (!taskActionsTask.value) return;
+  await db.tasks.update(taskActionsTask.value.id, {
+    intervenant_id: intervenantId,
+    updated_at: nowIso(),
+  });
+  closeTaskActionsSheet();
+};
+
+const handleTaskActionToggleStatus = async () => {
+  if (!taskActionsTask.value) return;
+  await toggleTaskStatus(taskActionsTask.value);
+  closeTaskActionsSheet();
+};
+
+const handleTaskActionDelete = async () => {
+  if (!taskActionsTask.value) return;
+  await deleteTask(taskActionsTask.value);
+  closeTaskActionsSheet();
 };
 
 
@@ -1280,6 +1313,62 @@ const deleteTask = async (task: Task) => {
   color: var(--notes-accent-contrast);
 }
 
+.notes-sheet-row-danger {
+  color: #ff6b6b;
+}
+
+.notes-sheet-row-danger:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.notes-sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.notes-sheet-section-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--notes-muted);
+  padding: 12px 16px 8px;
+  font-weight: 600;
+}
+
+.notes-sheet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.notes-sheet-chip {
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border: 1px solid var(--notes-border);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notes-sheet-chip:hover {
+  background: var(--notes-hover);
+  border-color: var(--notes-text);
+}
+
+.notes-sheet-chip.active {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+  border-color: var(--notes-accent);
+}
+
 .notes-sheet-cancel {
   background: transparent;
   color: var(--notes-accent);
@@ -1300,21 +1389,21 @@ const deleteTask = async (task: Task) => {
 
 
 .notes-list .notes-task-row + .notes-task-row {
-  margin-top: 8px;
+  margin-top: 4px;
   border-top: none;
-  box-shadow: 0 -8px 0 0 #000;
+  box-shadow: 0 -4px 0 0 #000;
 }
 
 .notes-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 10px 12px;
   color: inherit;
   background: transparent;
   border: none;
   text-align: left;
-  gap: 16px;
+  gap: 12px;
 }
 
 .notes-task-row {
@@ -1400,13 +1489,13 @@ const deleteTask = async (task: Task) => {
 }
 
 .notes-task-footer {
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   border-top: 1px solid var(--notes-border);
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .notes-task-actions {
@@ -1415,19 +1504,35 @@ const deleteTask = async (task: Task) => {
   gap: 8px;
 }
 
+.notes-task-menu {
+  background: transparent;
+  border: none;
+  color: var(--notes-muted);
+  font-size: 18px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.notes-task-menu:hover {
+  background: var(--notes-hover);
+  color: var(--notes-text);
+}
+
 .notes-observations {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 
 .notes-photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .notes-content-image {
@@ -1453,19 +1558,33 @@ const deleteTask = async (task: Task) => {
   gap: 12px;
 }
 
-.notes-filter-swap-button {
+.notes-filter-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.notes-filter-badge {
   border: 1px solid var(--notes-border);
   background: transparent;
-  color: var(--notes-text);
+  color: var(--notes-muted);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.notes-filter-swap-button:hover {
+.notes-filter-badge:hover {
   background: var(--notes-hover);
+  color: var(--notes-text);
+  border-color: var(--notes-text);
+}
+
+.notes-filter-badge.active {
+  background: transparent;
+  color: var(--notes-text);
   border-color: var(--notes-accent);
 }
 
@@ -1605,6 +1724,14 @@ const deleteTask = async (task: Task) => {
   font-weight: 600;
 }
 
+.notes-button-danger {
+  color: #ff6b6b;
+}
+
+.notes-button-danger:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
 .notes-category-badges {
   display: flex;
   flex-wrap: wrap;
@@ -1629,6 +1756,9 @@ const deleteTask = async (task: Task) => {
 }
 
 .notes-sheet-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 18px;
   font-weight: 600;
   padding: 16px 16px 8px;
