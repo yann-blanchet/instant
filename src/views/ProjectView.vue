@@ -44,253 +44,19 @@
       <div class="notes-row-subtitle">Ajouter une observation pour commencer la visite</div>
     </div>
 
-    <div class="notes-section-header">
-      <div class="notes-section-label">Open observations <span class="notes-count-badge">{{ sortedOpenTasks.length }}</span></div>
-      <div class="notes-filter-badges">
-        <button
-          class="notes-filter-badge"
-          :class="{ active: filterMode === 'date' }"
-          type="button"
-          @click="filterMode = 'date'"
-        >
-          Date
-        </button>
-        <button
-          class="notes-filter-badge"
-          :class="{ active: filterMode === 'assignee' }"
-          type="button"
-          @click="filterMode = 'assignee'"
-        >
-          Assignee
-        </button>
-      </div>
-    </div>
-
-    <div class="notes-list notes-task-list-container">
-      <div v-if="sortedOpenTasks.length === 0" class="notes-row notes-row-empty">
-        Aucune tâche.
-      </div>
-      <template v-if="filterMode === 'assignee' && groupedTasksByAssignee">
-        <div
-          v-for="group in groupedTasksByAssignee"
-          :key="group.assigneeId || '__unassigned__'"
-          class="notes-assignee-group"
-        >
-          <div class="notes-assignee-header">
-            <span class="notes-assignee-header-name">{{ group.assigneeName }}</span>
-            <div v-if="group.assigneeCategories.length > 0" class="notes-assignee-header-badges">
-              <span
-                v-for="category in group.assigneeCategories"
-                :key="category.id"
-                class="notes-assignee-header-badge"
-                :style="category.color ? { borderLeft: `3px solid ${category.color}` } : {}"
-              >
-                {{ category.name }}
-              </span>
-            </div>
-          </div>
-          <div
-            v-for="task in group.tasks"
-            :key="task.id"
-            class="notes-row notes-task-row"
-            @click="openTask(task)"
-          >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="openImageModal(url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-right">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-              </div>
-              <button
-                class="notes-task-menu"
-                type="button"
-                @click.stop.prevent="openTaskActionsSheet(task)"
-                aria-label="Task actions"
-              >
-                ⋯
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template v-else-if="filterMode === 'date' && groupedTasksByVisit">
-        <div
-          v-for="group in groupedTasksByVisit"
-          :key="group.visitId || '__novisit__'"
-          class="notes-visit-group"
-        >
-          <div class="notes-visit-header">
-            <span class="notes-visit-header-name">
-              {{ group.visitNumber != null ? `Visite ${formatVisitNumber(group.visitNumber)}` : "Sans visite" }}
-              <span v-if="group.visitDate" class="notes-visit-header-date"> · {{ formatDate(group.visitDate) }}</span>
-            </span>
-          </div>
-          <div
-            v-for="task in group.tasks"
-            :key="task.id"
-            class="notes-row notes-task-row"
-            @click="openTask(task)"
-          >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="openImageModal(url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-right">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-              </div>
-              <button
-                class="notes-task-menu"
-                type="button"
-                @click.stop.prevent="openTaskActionsSheet(task)"
-                aria-label="Task actions"
-              >
-                ⋯
-              </button>
-            </div>
-        </div>
-        </div>
-      </template>
-      <template v-else>
-        <div
-          v-for="task in sortedOpenTasks"
-          :key="task.id"
-          class="notes-row notes-task-row"
-          @click="openTask(task)"
-        >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="openImageModal(url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-right">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-              </div>
-              <button
-                class="notes-task-menu"
-                type="button"
-                @click.stop.prevent="openTaskActionsSheet(task)"
-                aria-label="Task actions"
-              >
-                ⋯
-              </button>
-            </div>
-        </div>
-      </template>
-    </div>
+    <ProjectObservationsList
+      :project-id="props.id"
+      :tasks="tasks"
+      :task-photos="taskPhotos"
+      :visits="visits"
+      :intervenants="intervenants"
+      :categories="categories"
+      :task-content-map="taskContentMap"
+      status="open"
+      @task-click="openTask"
+      @task-menu-click="openTaskActionsSheet"
+      @image-click="openImageModal"
+    />
 
     <div class="notes-bottom-bar">
       <button class="notes-bottom-icon" type="button" @click="openAddTaskWithText" aria-label="Add text observation">
@@ -314,6 +80,7 @@
     <div
       v-if="isTaskActionsSheetOpen"
       class="notes-sheet-backdrop"
+      :class="{ 'notes-sheet-backdrop-overlay': isDoneObservationsSheetOpen }"
       @click="closeTaskActionsSheet"
     >
       <div class="notes-sheet" @click.stop>
@@ -499,88 +266,21 @@
     >
       <div class="notes-sheet notes-sheet-fullscreen" @click.stop>
         <div class="notes-sheet-title">Done observations</div>
-        <div class="notes-list notes-sheet-task-list">
-          <div v-if="doneTasks.length === 0" class="notes-row notes-row-empty">
-            Aucune observation terminée.
-          </div>
-          <div
-            v-for="task in doneTasks"
-            :key="task.id"
-            class="notes-row notes-task-row"
-            @click="openTask(task)"
-          >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="openImageModal(url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-footer">
-              <div class="notes-row-meta">
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                  · {{ getTaskAssignee(task)?.name }}
-                </span>
-                <span v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
-                  <span v-if="task.opened_visit_id">
-                    · Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
-                  </span>
-                  <span v-if="task.done_visit_id">
-                    · Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
-                  </span>
-                </span>
-              </div>
-              <div class="notes-task-actions">
-                <button
-                  class="notes-status"
-                  type="button"
-                  @click.stop.prevent="toggleTaskStatus(task)"
-                >
-                  Mark as open
-                </button>
-                <button
-                  class="notes-delete"
-                  type="button"
-                  @click.stop.prevent="deleteTask(task)"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectObservationsList
+          :project-id="props.id"
+          :tasks="tasks"
+          :task-photos="taskPhotos"
+          :visits="visits"
+          :intervenants="intervenants"
+          :categories="categories"
+          :task-content-map="taskContentMap"
+          status="done"
+          title="Done observations"
+          :in-sheet="true"
+          @task-click="openTask"
+          @task-menu-click="openTaskActionsSheet"
+          @image-click="openImageModal"
+        />
         <div class="notes-sheet-actions">
           <button class="notes-button" type="button" @click="closeDoneObservations">
             Close
@@ -599,13 +299,13 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
+import ProjectObservationsList from "../components/ProjectObservationsList.vue";
 import type { Category, Intervenant, Task, TaskPhoto } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
-const filterMode = ref<"assignee" | "date">("date");
 const isActionsSheetOpen = ref(false);
 const isEditProjectSheetOpen = ref(false);
 const isProjectIntervenantsSheetOpen = ref(false);
@@ -673,6 +373,11 @@ const visitNumberMap = computed(() => {
 const getTaskAssignee = (task: Task) => {
   if (!task.intervenant_id) return null;
   return intervenants.value.find((i) => i.id === task.intervenant_id) ?? null;
+};
+
+const getIntervenantCategories = (intervenant: Intervenant | null) => {
+  if (!intervenant?.category_ids || intervenant.category_ids.length === 0) return [];
+  return categories.value.filter((c) => intervenant.category_ids?.includes(c.id));
 };
 
 const projectIntervenantsList = computed(() => {
@@ -756,106 +461,6 @@ const taskGroups = computed(() => {
 
 const openTasks = computed(() => taskGroups.value.open);
 const doneTasks = computed(() => taskGroups.value.done);
-
-const sortedOpenTasks = computed(() => {
-  const tasks = [...openTasks.value];
-  if (filterMode.value === "assignee") {
-    return tasks.sort((a, b) => {
-      const aAssignee = getTaskAssignee(a)?.name || "";
-      const bAssignee = getTaskAssignee(b)?.name || "";
-      if (aAssignee === bAssignee) {
-        return a.created_at.localeCompare(b.created_at);
-      }
-      if (!aAssignee) return 1;
-      if (!bAssignee) return -1;
-      return aAssignee.localeCompare(bAssignee);
-    });
-  } else {
-    // By date (ascending)
-    return tasks.sort((a, b) => a.created_at.localeCompare(b.created_at));
-  }
-});
-
-const getIntervenantCategories = (intervenant: Intervenant | null) => {
-  if (!intervenant?.category_ids || intervenant.category_ids.length === 0) return [];
-  return categories.value.filter((c) => intervenant.category_ids?.includes(c.id));
-};
-
-const groupedTasksByAssignee = computed(() => {
-  if (filterMode.value !== "assignee") return null;
-  
-  const groups: Array<{ assigneeName: string; assigneeId: string | null; assigneeCategories: Category[]; tasks: Task[] }> = [];
-  const assigneeMap = new Map<string | null, Task[]>();
-  
-  sortedOpenTasks.value.forEach((task) => {
-    const assignee = getTaskAssignee(task);
-    const assigneeId = assignee?.id || null;
-    const assigneeName = assignee?.name || "Générale";
-    
-    if (!assigneeMap.has(assigneeId)) {
-      assigneeMap.set(assigneeId, []);
-    }
-    assigneeMap.get(assigneeId)!.push(task);
-  });
-  
-  // Convert to array and sort by assignee name
-  assigneeMap.forEach((tasks, assigneeId) => {
-    const assignee = assigneeId ? intervenants.value.find(i => i.id === assigneeId) : null;
-    groups.push({
-      assigneeName: assignee?.name || "Générale",
-      assigneeId,
-      assigneeCategories: getIntervenantCategories(assignee),
-      tasks,
-    });
-  });
-  
-  // Sort groups: Générale last, others alphabetically
-  return groups.sort((a, b) => {
-    if (a.assigneeName === "Générale") return 1;
-    if (b.assigneeName === "Générale") return -1;
-    return a.assigneeName.localeCompare(b.assigneeName);
-  });
-});
-
-const groupedTasksByVisit = computed(() => {
-  if (filterMode.value !== "date") return null;
-  
-  const groups: Array<{ visitNumber: number | undefined; visitId: string | null; visitDate: string | null; tasks: Task[] }> = [];
-  const visitMap = new Map<string | null, Task[]>();
-  
-  sortedOpenTasks.value.forEach((task) => {
-    // Use opened_visit_id if available, otherwise visit_id
-    const taskVisitId = task.opened_visit_id || task.visit_id || null;
-    
-    if (!visitMap.has(taskVisitId)) {
-      visitMap.set(taskVisitId, []);
-    }
-    visitMap.get(taskVisitId)!.push(task);
-  });
-  
-  // Convert to array and sort by visit number (descending, newest first)
-  visitMap.forEach((tasks, visitId) => {
-    const visit = visitId ? visits.value.find(v => v.id === visitId) : null;
-    groups.push({
-      visitNumber: visit?.visit_number,
-      visitId,
-      visitDate: visit?.date || null,
-      tasks: tasks.sort((a, b) => a.created_at.localeCompare(b.created_at)), // Sort tasks within group by date
-    });
-  });
-  
-  // Sort groups: null/undefined visit numbers last, others by visit number ascending (older first)
-  return groups.sort((a, b) => {
-    if (a.visitNumber == null && b.visitNumber == null) return 0;
-    if (a.visitNumber == null) return 1;
-    if (b.visitNumber == null) return -1;
-    return a.visitNumber - b.visitNumber; // Ascending order (older first)
-  });
-});
-
-const toggleFilterMode = () => {
-  filterMode.value = filterMode.value === "assignee" ? "date" : "assignee";
-};
 
 
 const taskContentMap = ref<
@@ -1274,12 +879,20 @@ const deleteTask = async (task: Task) => {
 .notes-sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0, 0.5);
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 0 12px 12px;
   z-index: 50;
+}
+
+.notes-sheet-backdrop-fullscreen {
+  z-index: 60;
+}
+
+.notes-sheet-backdrop-overlay {
+  z-index: 70;
 }
 
 .notes-sheet {
