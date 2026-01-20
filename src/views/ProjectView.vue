@@ -60,6 +60,15 @@
           Done
           <span class="notes-badge-count">{{ taskGroups.done.length }}</span>
         </button>
+        <button
+          class="notes-badge"
+          :class="{ active: activeTaskTab === 'unassigned' }"
+          type="button"
+          @click="activeTaskTab = 'unassigned'"
+        >
+          Unassigned
+          <span class="notes-badge-count">{{ taskGroups.unassigned.length }}</span>
+        </button>
       </div>
     </div>
 
@@ -113,18 +122,18 @@
         </div>
         <div class="notes-task-footer">
           <div class="notes-row-meta">
-            <div>{{ formatRelativeTime(task.updated_at) }}</div>
-            <div v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-              {{ getTaskAssignee(task)?.name }}
-            </div>
-            <div v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
+            <span>{{ formatRelativeTime(task.updated_at) }}</span>
+            <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
+              · {{ getTaskAssignee(task)?.name }}
+            </span>
+            <span v-if="task.opened_visit_id || task.done_visit_id" class="notes-visit-meta">
               <span v-if="task.opened_visit_id">
-                Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
+                · Ouverte V{{ formatVisitNumber(visitNumberMap.get(task.opened_visit_id)) }}
               </span>
               <span v-if="task.done_visit_id">
-                Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
+                · Terminée V{{ formatVisitNumber(visitNumberMap.get(task.done_visit_id)) }}
               </span>
-            </div>
+            </span>
           </div>
           <div class="notes-task-actions">
             <button
@@ -256,7 +265,7 @@ import { makeId, nowIso, todayIso } from "../utils/time";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
-const activeTaskTab = ref<"open" | "done">("open");
+const activeTaskTab = ref<"open" | "done" | "unassigned">("open");
 const isActionsSheetOpen = ref(false);
 const isEditProjectSheetOpen = ref(false);
 const isProjectIntervenantsSheetOpen = ref(false);
@@ -323,8 +332,12 @@ const taskGroups = computed(() => {
   const grouped = {
     open: [] as Task[],
     done: [] as Task[],
+    unassigned: [] as Task[],
   };
   tasks.value.forEach((task) => {
+    if (!task.intervenant_id) {
+      grouped.unassigned.push(task);
+    }
     if (task.status === "done") {
       grouped.done.push(task);
     } else {
@@ -336,9 +349,10 @@ const taskGroups = computed(() => {
 
 const activeTaskGroup = computed(() => {
   const items = taskGroups.value[activeTaskTab.value] ?? [];
-  const labelMap = {
+  const labelMap: Record<"open" | "done" | "unassigned", string> = {
     open: "Open",
     done: "Done",
+    unassigned: "Unassigned",
   };
   return { label: labelMap[activeTaskTab.value], items };
 });
@@ -752,21 +766,23 @@ const deleteTask = async (task: Task) => {
 }
 
 .notes-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   color: var(--notes-muted);
 }
 
 .notes-assignee-meta {
-  margin-top: 4px;
   font-size: 11px;
   color: var(--notes-text);
   font-weight: 500;
 }
 
 .notes-visit-meta {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  display: inline-flex;
+  gap: 4px;
   font-size: 11px;
   color: var(--notes-muted);
 }
