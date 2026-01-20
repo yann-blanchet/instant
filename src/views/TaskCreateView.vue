@@ -220,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { liveQuery, type Subscription } from "dexie";
 import { useRoute, useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
@@ -616,6 +616,20 @@ const sendText = async () => {
 const openImagePicker = () => {
   imageInput.value?.click();
 };
+
+// Handle query parameter actions
+onMounted(() => {
+  const action = route.query.action;
+  if (action === "text") {
+    nextTick(() => {
+      openTextSheet();
+    });
+  } else if (action === "image") {
+    nextTick(() => {
+      openImagePicker();
+    });
+  }
+});
 
 const handleImagePicked = (event: Event) => {
   const input = event.target as HTMLInputElement;

@@ -71,7 +71,7 @@
       </div>
     </div>
 
-    <div class="notes-list">
+    <div class="notes-list notes-task-list-container">
       <div v-if="activeTaskGroup.items.length === 0" class="notes-row notes-row-empty">
         Aucune tâche.
       </div>
@@ -161,14 +161,24 @@
       </div>
     </div>
 
-    <button
-      class="notes-fab"
-      type="button"
-      aria-label="Add task"
-      @click="router.push(`/projects/${props.id}/tasks/new`)"
-    >
-      +
-    </button>
+    <div class="notes-bottom-bar">
+      <button class="notes-bottom-icon" type="button" @click="openAddTaskWithText" aria-label="Add text observation">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+      </button>
+      <button class="notes-bottom-icon" type="button" @click="openAddTaskWithImage" aria-label="Add image observation">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+      </button>
+    </div>
 
     <ImageModal
       :open="isImageModalOpen"
@@ -323,10 +333,12 @@ const project = useLiveQuery(
 );
 
 const tasks = useLiveQuery(
-  () =>
-    db.tasks
+  async () => {
+    const taskList = await db.tasks
       .filter((task) => !task.deleted_at && task.project_id === props.id)
-      .toArray(),
+      .toArray();
+    return taskList.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
   [] as Task[],
 );
 
@@ -427,6 +439,7 @@ const activeTaskGroup = computed(() => {
   };
   return { label: labelMap[activeTaskTab.value], items };
 });
+
 
 const taskContentMap = ref<
   Record<string, { observations: string[]; photos: string[] }>
@@ -580,6 +593,14 @@ const openTask = (task: Task) => {
   router.push(`/tasks/${task.id}/edit`);
 };
 
+const openAddTaskWithText = () => {
+  router.push(`/projects/${props.id}/tasks/new?action=text`);
+};
+
+const openAddTaskWithImage = () => {
+  router.push(`/projects/${props.id}/tasks/new?action=image`);
+};
+
 onBeforeUnmount(() => {
   revokeTaskContentUrls();
 });
@@ -693,22 +714,42 @@ const deleteTask = async (task: Task) => {
   justify-content: center;
 }
 
-.notes-fab {
+.notes-bottom-bar {
   position: fixed;
-  right: 24px;
-  bottom: 28px;
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  border: 2px solid var(--notes-accent);
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: #000;
-  color: var(--notes-accent);
-  font-size: 28px;
-  line-height: 1;
-  display: inline-flex;
+  border-top: none;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 10;
+}
+
+.notes-bottom-icon {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--notes-text);
+  display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+  flex: 1;
+  max-width: 44px;
+}
+
+.notes-bottom-icon:hover {
+  background: var(--notes-hover);
+}
+
+.notes-bottom-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
 .notes-sheet-backdrop {
@@ -766,6 +807,11 @@ const deleteTask = async (task: Task) => {
   display: flex;
   flex-direction: column;
 }
+
+.notes-task-list-container {
+  padding-bottom: 80px;
+}
+
 
 .notes-list .notes-task-row + .notes-task-row {
   margin-top: 8px;
