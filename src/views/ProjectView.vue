@@ -7,7 +7,6 @@
         </button>
         <div>
           <h1 class="notes-title">{{ project?.name ?? "Projet" }}</h1>
-          <div class="notes-subtitle">{{ project?.address }}</div>
         </div>
       </div>
       <button
@@ -548,14 +547,14 @@ const deleteTask = async (task: Task) => {
 .notes-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
 }
 
 .notes-header-left {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 16px;
 }
 
 .notes-back {
@@ -564,13 +563,17 @@ const deleteTask = async (task: Task) => {
   color: var(--notes-accent);
   font-size: 28px;
   line-height: 1;
-  padding: 2px 6px;
+  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 .notes-title {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.2px;
+  line-height: 1;
+  margin: 0;
 }
 
 .notes-subtitle {
