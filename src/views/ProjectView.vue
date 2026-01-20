@@ -95,62 +95,60 @@
             class="notes-row notes-task-row"
             @click="openTask(task)"
           >
-        <div class="notes-row-text">
-          <div
-            v-if="taskContentMap[task.id]?.observations?.length"
-            class="notes-observations"
-          >
-            <div
-              v-for="(text, index) in taskContentMap[task.id].observations"
-              :key="`${task.id}-obs-${index}`"
-              class="notes-row-subtitle"
-            >
-              {{ text }}
+            <div class="notes-row-text">
+              <div
+                v-if="taskContentMap[task.id]?.observations?.length"
+                class="notes-observations"
+              >
+                <div
+                  v-for="(text, index) in taskContentMap[task.id].observations"
+                  :key="`${task.id}-obs-${index}`"
+                  class="notes-row-subtitle"
+                >
+                  {{ text }}
+                </div>
+              </div>
+
+              <div
+                v-if="taskContentMap[task.id]?.photos?.length"
+                class="notes-photo-grid"
+              >
+                <img
+                  v-for="(url, index) in taskContentMap[task.id].photos"
+                  :key="`${task.id}-photo-${index}`"
+                  class="notes-content-image"
+                  :src="url"
+                  alt="Task photo"
+                  @click.stop="openImageModal(url)"
+                />
+              </div>
+
+              <div
+                v-if="
+                  !taskContentMap[task.id]?.observations?.length &&
+                  !taskContentMap[task.id]?.photos?.length
+                "
+                class="notes-row-subtitle"
+              >
+                Aucun contenu.
+              </div>
             </div>
-          </div>
-
-          <div
-            v-if="taskContentMap[task.id]?.photos?.length"
-            class="notes-photo-grid"
-          >
-            <img
-              v-for="(url, index) in taskContentMap[task.id].photos"
-              :key="`${task.id}-photo-${index}`"
-              class="notes-content-image"
-              :src="url"
-              alt="Task photo"
-              @click.stop="openImageModal(url)"
-            />
-          </div>
-
-          <div
-            v-if="
-              !taskContentMap[task.id]?.observations?.length &&
-              !taskContentMap[task.id]?.photos?.length
-            "
-            class="notes-row-subtitle"
-          >
-            Aucun contenu.
-          </div>
-        </div>
-        <div class="notes-task-footer">
-          <div class="notes-row-meta">
-            <span>{{ formatRelativeTime(task.updated_at) }}</span>
-            <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-              · {{ getTaskAssignee(task)?.name }}
-            </span>
-          </div>
-          <div class="notes-task-actions">
-            <button
-              class="notes-task-menu"
-              type="button"
-              @click.stop.prevent="openTaskActionsSheet(task)"
-              aria-label="Task actions"
-            >
-              ⋯
-            </button>
-          </div>
-        </div>
+            <div class="notes-task-right">
+              <div class="notes-row-meta">
+                <span>{{ formatRelativeTime(task.updated_at) }}</span>
+                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
+                  · {{ getTaskAssignee(task)?.name }}
+                </span>
+              </div>
+              <button
+                class="notes-task-menu"
+                type="button"
+                @click.stop.prevent="openTaskActionsSheet(task)"
+                aria-label="Task actions"
+              >
+                ⋯
+              </button>
+            </div>
           </div>
         </div>
       </template>
@@ -172,52 +170,51 @@
             class="notes-row notes-task-row"
             @click="openTask(task)"
           >
-          <div class="notes-row-text">
-            <div
-              v-if="taskContentMap[task.id]?.observations?.length"
-              class="notes-observations"
-            >
+            <div class="notes-row-text">
               <div
-                v-for="(text, index) in taskContentMap[task.id].observations"
-                :key="`${task.id}-obs-${index}`"
+                v-if="taskContentMap[task.id]?.observations?.length"
+                class="notes-observations"
+              >
+                <div
+                  v-for="(text, index) in taskContentMap[task.id].observations"
+                  :key="`${task.id}-obs-${index}`"
+                  class="notes-row-subtitle"
+                >
+                  {{ text }}
+                </div>
+              </div>
+
+              <div
+                v-if="taskContentMap[task.id]?.photos?.length"
+                class="notes-photo-grid"
+              >
+                <img
+                  v-for="(url, index) in taskContentMap[task.id].photos"
+                  :key="`${task.id}-photo-${index}`"
+                  class="notes-content-image"
+                  :src="url"
+                  alt="Task photo"
+                  @click.stop="openImageModal(url)"
+                />
+              </div>
+
+              <div
+                v-if="
+                  !taskContentMap[task.id]?.observations?.length &&
+                  !taskContentMap[task.id]?.photos?.length
+                "
                 class="notes-row-subtitle"
               >
-                {{ text }}
+                Aucun contenu.
               </div>
             </div>
-
-            <div
-              v-if="taskContentMap[task.id]?.photos?.length"
-              class="notes-photo-grid"
-            >
-              <img
-                v-for="(url, index) in taskContentMap[task.id].photos"
-                :key="`${task.id}-photo-${index}`"
-                class="notes-content-image"
-                :src="url"
-                alt="Task photo"
-                @click.stop="openImageModal(url)"
-              />
-            </div>
-
-            <div
-              v-if="
-                !taskContentMap[task.id]?.observations?.length &&
-                !taskContentMap[task.id]?.photos?.length
-              "
-              class="notes-row-subtitle"
-            >
-              Aucun contenu.
-            </div>
-          </div>
-          <div class="notes-task-footer">
-            <div class="notes-row-meta">
-              <span>{{ formatRelativeTime(task.updated_at) }}</span>
-              <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                · {{ getTaskAssignee(task)?.name }}
-              </span>
-            </div>
-            <div class="notes-task-actions">
+            <div class="notes-task-right">
+              <div class="notes-row-meta">
+                <span>{{ formatRelativeTime(task.updated_at) }}</span>
+                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
+                  · {{ getTaskAssignee(task)?.name }}
+                </span>
+              </div>
               <button
                 class="notes-task-menu"
                 type="button"
@@ -227,7 +224,6 @@
                 ⋯
               </button>
             </div>
-          </div>
         </div>
         </div>
       </template>
@@ -238,52 +234,51 @@
           class="notes-row notes-task-row"
           @click="openTask(task)"
         >
-          <div class="notes-row-text">
-            <div
-              v-if="taskContentMap[task.id]?.observations?.length"
-              class="notes-observations"
-            >
+            <div class="notes-row-text">
               <div
-                v-for="(text, index) in taskContentMap[task.id].observations"
-                :key="`${task.id}-obs-${index}`"
+                v-if="taskContentMap[task.id]?.observations?.length"
+                class="notes-observations"
+              >
+                <div
+                  v-for="(text, index) in taskContentMap[task.id].observations"
+                  :key="`${task.id}-obs-${index}`"
+                  class="notes-row-subtitle"
+                >
+                  {{ text }}
+                </div>
+              </div>
+
+              <div
+                v-if="taskContentMap[task.id]?.photos?.length"
+                class="notes-photo-grid"
+              >
+                <img
+                  v-for="(url, index) in taskContentMap[task.id].photos"
+                  :key="`${task.id}-photo-${index}`"
+                  class="notes-content-image"
+                  :src="url"
+                  alt="Task photo"
+                  @click.stop="openImageModal(url)"
+                />
+              </div>
+
+              <div
+                v-if="
+                  !taskContentMap[task.id]?.observations?.length &&
+                  !taskContentMap[task.id]?.photos?.length
+                "
                 class="notes-row-subtitle"
               >
-                {{ text }}
+                Aucun contenu.
               </div>
             </div>
-
-            <div
-              v-if="taskContentMap[task.id]?.photos?.length"
-              class="notes-photo-grid"
-            >
-              <img
-                v-for="(url, index) in taskContentMap[task.id].photos"
-                :key="`${task.id}-photo-${index}`"
-                class="notes-content-image"
-                :src="url"
-                alt="Task photo"
-                @click.stop="openImageModal(url)"
-              />
-            </div>
-
-            <div
-              v-if="
-                !taskContentMap[task.id]?.observations?.length &&
-                !taskContentMap[task.id]?.photos?.length
-              "
-              class="notes-row-subtitle"
-            >
-              Aucun contenu.
-            </div>
-          </div>
-          <div class="notes-task-footer">
-            <div class="notes-row-meta">
-              <span>{{ formatRelativeTime(task.updated_at) }}</span>
-              <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
-                · {{ getTaskAssignee(task)?.name }}
-              </span>
-            </div>
-            <div class="notes-task-actions">
+            <div class="notes-task-right">
+              <div class="notes-row-meta">
+                <span>{{ formatRelativeTime(task.updated_at) }}</span>
+                <span v-if="getTaskAssignee(task)" class="notes-assignee-meta">
+                  · {{ getTaskAssignee(task)?.name }}
+                </span>
+              </div>
               <button
                 class="notes-task-menu"
                 type="button"
@@ -293,7 +288,6 @@
                 ⋯
               </button>
             </div>
-          </div>
         </div>
       </template>
     </div>
@@ -340,10 +334,16 @@
               :key="intervenant.id"
               class="notes-sheet-chip"
               :class="{ active: taskActionsTask?.intervenant_id === intervenant.id }"
+              :style="getIntervenantCategories(intervenant).length > 0 && getIntervenantCategories(intervenant)[0]?.color ? { borderColor: getIntervenantCategories(intervenant)[0].color } : {}"
               type="button"
               @click="handleTaskActionAssignToIntervenant(intervenant.id)"
             >
-              {{ intervenant.name }}
+              <div class="notes-sheet-chip-content">
+                <div class="notes-sheet-chip-name">{{ intervenant.name }}</div>
+                <div v-if="getIntervenantCategories(intervenant).length > 0" class="notes-sheet-chip-category">
+                  {{ getIntervenantCategories(intervenant)[0].name }}
+                </div>
+              </div>
             </button>
           </div>
         </div>
@@ -1356,6 +1356,7 @@ const deleteTask = async (task: Task) => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  text-align: left;
 }
 
 .notes-sheet-chip:hover {
@@ -1367,6 +1368,24 @@ const deleteTask = async (task: Task) => {
   background: var(--notes-accent);
   color: var(--notes-accent-contrast);
   border-color: var(--notes-accent);
+}
+
+.notes-sheet-chip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.notes-sheet-chip-name {
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.notes-sheet-chip-category {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.2;
 }
 
 .notes-sheet-cancel {
@@ -1407,8 +1426,17 @@ const deleteTask = async (task: Task) => {
 }
 
 .notes-task-row {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notes-task-right {
+  display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 100px;
 }
 
 .notes-visit-row {
@@ -1455,6 +1483,8 @@ const deleteTask = async (task: Task) => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .notes-row-title {
@@ -1488,20 +1518,9 @@ const deleteTask = async (task: Task) => {
   color: var(--notes-muted);
 }
 
-.notes-task-footer {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-top: 1px solid var(--notes-border);
-  padding-top: 6px;
-}
-
-.notes-task-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.notes-row-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .notes-task-menu {
