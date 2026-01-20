@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="notes-section-header">
-      <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Open observations') }} <span class="notes-count-badge">{{ sortedTasks.length }}</span></div>
+      <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Open observations') }} <span class="notes-count-badge">{{ assignedTasks.length }}</span></div>
       <div class="notes-filter-badges">
         <button
           class="notes-filter-badge"
@@ -357,6 +357,10 @@ const isUnassigned = (assigneeId: string | null): boolean => {
 const filteredTasks = computed(() => {
   const statusFilter = props.status || "open";
   return props.tasks.filter((task) => task.status === statusFilter);
+});
+
+const assignedTasks = computed(() => {
+  return filteredTasks.value.filter((task) => task.intervenant_id != null);
 });
 
 const sortedTasks = computed(() => {
