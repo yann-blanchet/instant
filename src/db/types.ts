@@ -43,6 +43,7 @@ export interface TaskPhoto {
   id: string;
   task_id: string;
   url?: string | null;
+  storage_path?: string | null;
   image_blob?: Blob | null;
   created_at: string;
   updated_at: string;

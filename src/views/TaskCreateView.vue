@@ -661,15 +661,19 @@ const sendImage = async () => {
   const taskId = await ensureTask(visitId);
   const timestamp = nowIso();
   const photoId = makeId();
+  
+  // Store photo locally with null URL - it will be uploaded to Storage during sync
   await db.task_photos.add({
     id: photoId,
     task_id: taskId,
     url: null,
+    storage_path: null,
     image_blob: imageFile.value,
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
   });
+  
   const task = await db.tasks.get(taskId);
   const nextPhotoIds = [...(task?.photo_ids ?? []), photoId];
   await db.tasks.update(taskId, { photo_ids: nextPhotoIds, updated_at: timestamp });

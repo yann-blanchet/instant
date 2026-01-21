@@ -103,8 +103,57 @@ async function pullDeletes<T extends { id: string; updated_at: string }>(
 }
 
 /**
+ * Upload a photo blob to Supabase Storage
+ * Returns the public URL and storage path if successful
+ */
+async function uploadPhotoToStorage(
+  photoId: string,
+  taskId: string,
+  imageBlob: Blob
+): Promise<{ url: string; storagePath: string } | null> {
+  if (!supabase) {
+    return null;
+  }
+
+  try {
+    // Determine file extension from blob type or default to jpg
+    const blobType = imageBlob.type;
+    const fileExt = blobType.includes('png') ? 'png' : blobType.includes('webp') ? 'webp' : 'jpg';
+    const fileName = `${photoId}.${fileExt}`;
+    const filePath = `${taskId}/${fileName}`;
+    
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('task-photos')
+      .upload(filePath, imageBlob, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (uploadError) {
+      console.error(`Failed to upload photo ${photoId} to Storage:`, uploadError);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('task-photos')
+      .getPublicUrl(filePath);
+    
+    return {
+      url: publicUrl,
+      storagePath: filePath
+    };
+  } catch (error) {
+    console.error(`Error uploading photo ${photoId} to Storage:`, error);
+    return null;
+  }
+}
+
+/**
  * Push local changes to Supabase
  * Uploads records that are new or updated locally
+ * For task_photos, uploads images to Storage first if needed
  */
 async function pushToSupabase<T extends { id: string; updated_at: string }>(
   table: string,
@@ -141,6 +190,30 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
     return 0;
   }
   
+  // Special handling for task_photos: upload images to Storage first
+  if (table === 'task_photos') {
+    for (const record of recordsToSync) {
+      const photo = record as any as TaskPhoto;
+      // If photo has no URL but has a blob, upload it to Storage
+      if (!photo.url && !photo.storage_path && photo.image_blob) {
+        const uploadResult = await uploadPhotoToStorage(photo.id, photo.task_id, photo.image_blob);
+        if (uploadResult) {
+          // Update local record with URL and storage path
+          await db.task_photos.update(photo.id, {
+            url: uploadResult.url,
+            storage_path: uploadResult.storagePath,
+            updated_at: new Date().toISOString(),
+          });
+          // Update the record object for the push
+          photo.url = uploadResult.url;
+          photo.storage_path = uploadResult.storagePath;
+        } else {
+          // Skip this record if upload failed
+          console.warn(`Skipping photo ${photo.id} - Storage upload failed`);
+        }
+      }
+    }
+  }
 
   // Map and clean records for Supabase
   const recordsForUpload = recordsToSync.map((record) => {
@@ -172,8 +245,7 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
       delete rest.photo_list;
     }
     
-    // task_photos: skip records with null url (they need to be uploaded to Storage first)
-    // These records can't be synced until images are uploaded to Supabase Storage
+    // task_photos: skip records with null url (upload to Storage failed)
     if (table === 'task_photos' && !rest.url && !rest.storage_path) {
       return null;
     }

@@ -17,16 +17,30 @@
 
 ## Step 2: Set Up Storage Policies
 
-After creating the bucket, you have two options:
+**IMPORTANT**: You must set up storage policies for uploads to work. The app uses anonymous access, so policies must allow `anon` role.
 
-### Option A: Public Bucket (Recommended for this use case)
-If you made the bucket public, photos will be accessible via public URLs. You still need policies for upload/delete:
+### Quick Setup (Recommended)
+
+1. Go to **Supabase Dashboard** → **SQL Editor**
+2. Copy and paste the entire contents of `supabase/storage-setup.sql`
+3. Click **Run** to execute the SQL
+4. This will:
+   - Enable RLS on storage.objects
+   - Drop any existing conflicting policies
+   - Create policies that allow both `anon` and `authenticated` users to upload, read, update, and delete photos
+
+### Manual Setup (Alternative)
+
+If you prefer to set up policies via the UI:
 
 1. Go to **Storage** > **Policies** > **task-photos**
-2. Add policies for authenticated users to upload and delete
+2. Create policies for:
+   - **INSERT** (upload): Allow `anon` and `authenticated` roles, condition: `bucket_id = 'task-photos'`
+   - **SELECT** (read): Allow `anon` and `authenticated` roles, condition: `bucket_id = 'task-photos'`
+   - **UPDATE**: Allow `anon` and `authenticated` roles, condition: `bucket_id = 'task-photos'`
+   - **DELETE**: Allow `anon` and `authenticated` roles, condition: `bucket_id = 'task-photos'`
 
-### Option B: Private Bucket
-If you made the bucket private, you'll need policies for all operations. Run the SQL in `storage-setup.sql` or configure via the UI.
+**Note**: The bucket can be either public or private - the policies will work for both. Public buckets allow direct URL access, private buckets require authentication to view.
 
 ## Step 3: Update Your Application Code
 
