@@ -303,6 +303,7 @@ import ProjectObservationsList from "../components/ProjectObservationsList.vue";
 import type { Category, Intervenant, Task, TaskPhoto } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
+import { generatePdfContent, exportPdf } from "../utils/pdfGenerator";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -515,14 +516,23 @@ watch(
 );
 
 
-const exportPdf = () => {
-  alert("PDF export is ready for implementation. Use print for now.");
-  window.print();
+const exportProjectPdf = () => {
+  if (!project.value) return;
+  
+  const content = generatePdfContent({
+    projectName: project.value.name,
+    tasks: openTasks.value,
+    taskContentMap: taskContentMap.value,
+    intervenants: intervenants.value,
+    categories: categories.value,
+  });
+  
+  exportPdf(project.value.name, content);
 };
 
 const handleExportReport = () => {
   isActionsSheetOpen.value = false;
-  exportPdf();
+  exportProjectPdf();
 };
 
 const showPastVisits = () => {
