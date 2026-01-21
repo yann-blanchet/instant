@@ -229,6 +229,7 @@ import { getNextVisitNumber } from "../db/visits";
 import type { Task, TaskPhoto } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
+import { compressImage } from "../utils/imageCompression";
 
 const router = useRouter();
 const route = useRoute();
@@ -662,13 +663,24 @@ const sendImage = async () => {
   const timestamp = nowIso();
   const photoId = makeId();
   
+  console.log('[TaskCreateView] Original image size:', (imageFile.value.size / 1024 / 1024).toFixed(2), 'MB');
+  
+  // Compress image before storing (reduces storage and improves sync performance)
+  const compressedBlob = await compressImage(imageFile.value, {
+    maxSizeMB: 1, // Target 1MB max
+    maxWidthOrHeight: 1920, // Limit to 1920px on longest side
+    initialQuality: 0.85, // 85% quality (good balance)
+  });
+  
+  console.log('[TaskCreateView] Compressed image size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+  
   // Store photo locally with null URL - it will be uploaded to Storage during sync
   await db.task_photos.add({
     id: photoId,
     task_id: taskId,
     url: null,
     storage_path: null,
-    image_blob: imageFile.value,
+    image_blob: compressedBlob,
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,

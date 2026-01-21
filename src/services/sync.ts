@@ -1,6 +1,7 @@
 import { supabase } from "../supabase";
 import { db } from "../db";
 import type { Project, Task, Visit, TaskPhoto, Intervenant, Category } from "../db/types";
+import { compressImage } from "../utils/imageCompression";
 
 /**
  * Sync strategy for solo user, multi-device, sequential updates:
@@ -196,12 +197,31 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
       const photo = record as any as TaskPhoto;
       // If photo has no URL but has a blob, upload it to Storage
       if (!photo.url && !photo.storage_path && photo.image_blob) {
-        const uploadResult = await uploadPhotoToStorage(photo.id, photo.task_id, photo.image_blob);
+        // Only compress if the image is larger than 1MB (it should already be compressed)
+        // This avoids unnecessary re-compression of already-compressed images
+        const imageSizeMB = photo.image_blob.size / 1024 / 1024;
+        let blobToUpload = photo.image_blob;
+        
+        if (imageSizeMB > 1.1) {
+          // Image is larger than 1MB, compress it
+          console.log(`[Sync] Compressing large image before upload: ${imageSizeMB.toFixed(2)}MB`);
+          blobToUpload = await compressImage(photo.image_blob, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            initialQuality: 0.85,
+          });
+        } else {
+          console.log(`[Sync] Image already compressed (${imageSizeMB.toFixed(2)}MB), skipping compression`);
+        }
+        
+        const uploadResult = await uploadPhotoToStorage(photo.id, photo.task_id, blobToUpload);
         if (uploadResult) {
           // Update local record with URL and storage path
+          // Also update the blob to the compressed version to save local storage
           await db.task_photos.update(photo.id, {
             url: uploadResult.url,
             storage_path: uploadResult.storagePath,
+            image_blob: blobToUpload, // Store compressed version locally too
             updated_at: new Date().toISOString(),
           });
           // Update the record object for the push
