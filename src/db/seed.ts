@@ -12,11 +12,11 @@ export async function seedIfEmpty() {
 
   const created_at = nowIso();
 
-  const project: Project = {
+  // Define in dependency order: category -> intervenant -> project -> visit -> task
+  const category: Category = {
     id: makeId(),
-    name: "Riverside Loft",
-    address: "12 Rue des Arches, Lyon",
-    intervenant_ids: [intervenant.id],
+    name: "Electricity",
+    color: "#339af0",
     created_at,
     updated_at: created_at,
     deleted_at: null,
@@ -33,10 +33,23 @@ export async function seedIfEmpty() {
     deleted_at: null,
   };
 
-  const category: Category = {
+  const project: Project = {
     id: makeId(),
-    name: "Electricity",
-    color: "#339af0",
+    name: "Riverside Loft",
+    address: "12 Rue des Arches, Lyon",
+    intervenant_ids: [intervenant.id],
+    created_at,
+    updated_at: created_at,
+    deleted_at: null,
+  };
+
+  const visit: Visit = {
+    id: makeId(),
+    project_id: project.id,
+    date: todayIso(),
+    conclusion: "",
+    visit_number: 1,
+    ended_at: null,
     created_at,
     updated_at: created_at,
     deleted_at: null,
@@ -69,18 +82,6 @@ export async function seedIfEmpty() {
     intervenant_id: null,
     photo_ids: [],
     observations: ["Check stair railing height"],
-    created_at,
-    updated_at: created_at,
-    deleted_at: null,
-  };
-
-  const visit: Visit = {
-    id: makeId(),
-    project_id: project.id,
-    date: todayIso(),
-    conclusion: "",
-    visit_number: 1,
-    ended_at: null,
     created_at,
     updated_at: created_at,
     deleted_at: null,

@@ -263,9 +263,24 @@
       <div class="notes-section-label">Backup / Sync</div>
       <div class="notes-list notes-form">
         <p class="notes-help">
-          Configure Supabase credentials in <code>.env</code> to enable sync.
+          Sync is automatic. Data syncs in the background when you make changes.
         </p>
-        <button class="notes-button" type="button" @click="runSync">Run Sync</button>
+        <p class="notes-help" style="margin-top: 8px; font-size: 12px; color: var(--notes-muted);">
+          Sync happens: on app start, after changes (2s delay), when online, every 5 minutes, and before closing.
+        </p>
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; color: var(--notes-text); font-size: 13px; padding: 8px 0;">
+            Advanced: Manual Sync
+          </summary>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+            <button class="notes-button" type="button" @click="runSync">
+              Force Sync Now
+            </button>
+            <button class="notes-button" type="button" @click="runFullSync" style="font-size: 12px;">
+              Full Sync (All Data)
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   </section>
@@ -421,6 +436,26 @@ const saveCategory = async () => {
   closeCategorySheet();
 };
 
+const runSync = async () => {
+  try {
+    await syncNow(false);
+    alert("Sync completed!");
+  } catch (error) {
+    console.error("Sync error:", error);
+    alert(`Sync failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+const runFullSync = async () => {
+  try {
+    await syncNow(true);
+    alert("Full sync completed! All data has been pushed.");
+  } catch (error) {
+    console.error("Full sync error:", error);
+    alert(`Full sync failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 const closeCategorySheet = () => {
   isCategorySheetOpen.value = false;
   editingCategoryId.value = null;
@@ -428,9 +463,6 @@ const closeCategorySheet = () => {
   categoryColor.value = colorPalette[0];
 };
 
-const runSync = async () => {
-  await syncNow();
-};
 </script>
 
 <style scoped>

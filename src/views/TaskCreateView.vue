@@ -93,10 +93,10 @@
           <polyline points="21 15 16 10 5 21"></polyline>
         </svg>
       </button>
-      <button class="notes-bottom-icon notes-bottom-send" type="button" @click="sendAndBack" aria-label="Send">
+      <button class="notes-bottom-icon notes-bottom-close" type="button" @click="handleBack" aria-label="Close">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
       <input
@@ -260,7 +260,6 @@ const updateProjectQuery = () => {
   }
   
   const pid = projectId.value;
-  console.log("[TaskCreateView] updateProjectQuery called with projectId:", pid);
   
   if (!pid) {
     project.value = null;
@@ -270,11 +269,10 @@ const updateProjectQuery = () => {
   // Create new subscription
   projectSubscription = liveQuery(() => db.projects.get(pid)).subscribe({
     next: (value) => {
-      console.log("[TaskCreateView] project.value updated:", value);
       project.value = value;
     },
     error: (error) => {
-      console.error("[TaskCreateView] Project query error:", error);
+      console.error("Project query error:", error);
     },
   });
 };
@@ -284,7 +282,6 @@ watch(projectId, updateProjectQuery, { immediate: true });
 
 // Watch project changes
 watch(project, (p) => {
-  console.log("[TaskCreateView] project.value changed:", p);
 }, { immediate: true, deep: true });
 
 onBeforeUnmount(() => {
@@ -301,40 +298,28 @@ watch(isAssigneeSheetOpen, async (isOpen) => {
   if (isOpen && projectId.value) {
     // Force a refresh by re-querying the project
     const freshProject = await db.projects.get(projectId.value);
-    console.log("[TaskCreateView] Fresh project from DB when sheet opens:", freshProject);
-    console.log("[TaskCreateView] Current project.value:", project.value);
   }
 });
 
 const projectIntervenants = computed(() => {
   if (!project.value) {
-    console.log("[TaskCreateView] projectIntervenants: no project.value");
     return [];
   }
   const projectIntervenantIds = project.value.intervenant_ids;
-  console.log("[TaskCreateView] projectIntervenants: project.value =", project.value);
-  console.log("[TaskCreateView] projectIntervenants: projectIntervenantIds =", projectIntervenantIds);
-  console.log("[TaskCreateView] projectIntervenants: intervenants.value =", intervenants.value);
   if (!projectIntervenantIds || !Array.isArray(projectIntervenantIds) || projectIntervenantIds.length === 0) {
-    console.log("[TaskCreateView] projectIntervenants: no projectIntervenantIds or empty array");
     return [];
   }
   if (!intervenants.value || !Array.isArray(intervenants.value) || intervenants.value.length === 0) {
-    console.log("[TaskCreateView] projectIntervenants: no intervenants.value or empty array");
     return [];
   }
   const filtered = intervenants.value.filter((intervenant) =>
     projectIntervenantIds.includes(intervenant.id)
   );
-  console.log("[TaskCreateView] projectIntervenants: filtered result =", filtered);
-  console.log("[TaskCreateView] projectIntervenants: checking IDs", {
-    projectIds: projectIntervenantIds,
-    intervenantIds: intervenants.value.map(i => i.id),
-    matches: intervenants.value.map(i => ({ id: i.id, name: i.name, included: projectIntervenantIds.includes(i.id) }))
-  });
   return filtered;
 });
-const headerTitle = computed(() => "Nouvelle observation");
+const headerTitle = computed(() => 
+  editingTaskId.value ? "Observation" : "Nouvelle observation"
+);
 
 const form = reactive<{
   intervenant_id: string | null;
@@ -691,15 +676,8 @@ const sendImage = async () => {
   closeImageSheet();
 };
 
-const sendAndBack = async () => {
-  if (!hasContent.value) {
-    handleBack();
-    return;
-  }
-  const visitId = await ensureOngoingVisit();
-  await ensureTask(visitId);
-  handleBack();
-};
+// Removed sendAndBack - tasks are saved automatically when adding text/image
+// The close button just navigates back
 
 const handleBack = () => {
   const targetProjectId = projectId.value ?? taskRecord.value?.project_id ?? null;
@@ -998,7 +976,7 @@ onBeforeUnmount(() => {
   height: 24px;
 }
 
-.notes-bottom-send {
+.notes-bottom-close {
   color: var(--notes-accent);
 }
 
@@ -1021,7 +999,7 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.notes-bottom-send {
+.notes-bottom-close {
   width: 44px;
   height: 44px;
   border: none;

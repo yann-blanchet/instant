@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS task_photos (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  url TEXT NOT NULL, -- Public URL from Supabase Storage bucket
+  url TEXT, -- Public URL from Supabase Storage bucket (nullable for migration)
   storage_path TEXT, -- Path in storage bucket (e.g., 'task-photos/{task_id}/{photo_id}.jpg')
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -117,21 +117,27 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers to automatically update updated_at
+DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_intervenants_updated_at ON intervenants;
 CREATE TRIGGER update_intervenants_updated_at BEFORE UPDATE ON intervenants
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_visits_updated_at ON visits;
 CREATE TRIGGER update_visits_updated_at BEFORE UPDATE ON visits
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_task_photos_updated_at ON task_photos;
 CREATE TRIGGER update_task_photos_updated_at BEFORE UPDATE ON task_photos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -144,31 +150,44 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_photos ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS policies (adjust based on your authentication needs)
--- For now, allowing all operations - you should customize these based on your auth setup
+-- For now, allowing all operations for anon role (public access)
+-- You should customize these based on your auth setup
 
 -- Projects policies
+DROP POLICY IF EXISTS "Allow all operations on projects" ON projects;
 CREATE POLICY "Allow all operations on projects" ON projects
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Categories policies
+DROP POLICY IF EXISTS "Allow all operations on categories" ON categories;
 CREATE POLICY "Allow all operations on categories" ON categories
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Intervenants policies
+DROP POLICY IF EXISTS "Allow all operations on intervenants" ON intervenants;
 CREATE POLICY "Allow all operations on intervenants" ON intervenants
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Visits policies
+DROP POLICY IF EXISTS "Allow all operations on visits" ON visits;
 CREATE POLICY "Allow all operations on visits" ON visits
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Tasks policies
+DROP POLICY IF EXISTS "Allow all operations on tasks" ON tasks;
 CREATE POLICY "Allow all operations on tasks" ON tasks
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Task photos policies
+DROP POLICY IF EXISTS "Allow all operations on task_photos" ON task_photos;
 CREATE POLICY "Allow all operations on task_photos" ON task_photos
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL TO anon, authenticated
+  USING (true) WITH CHECK (true);
 
 -- Optional: Create a function to get next visit number for a project
 CREATE OR REPLACE FUNCTION get_next_visit_number(p_project_id UUID)
