@@ -64,13 +64,28 @@
           Aucune photo.
         </div>
         <div v-else class="notes-photo-grid">
-          <img
-            v-for="(url, index) in photoPreviewUrls"
-            :key="`photo-${index}`"
-            class="notes-photo"
-            :src="url"
-            alt="Task photo"
-          />
+          <div
+            v-for="photoId in (taskRecord?.photo_ids ?? []).filter(id => photoIdToUrlMap.has(id))"
+            :key="`photo-${photoId}`"
+            class="notes-photo-wrapper"
+          >
+            <img
+              :src="photoIdToUrlMap.get(photoId)"
+              class="notes-photo"
+              alt="Task photo"
+            />
+            <button
+              class="notes-photo-delete"
+              type="button"
+              aria-label="Delete photo"
+              @click="deletePhoto(photoId)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -230,6 +245,7 @@ import type { Task, TaskPhoto } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import { compressImage } from "../utils/imageCompression";
+import { supabase } from "../supabase";
 
 const router = useRouter();
 const route = useRoute();
@@ -351,6 +367,7 @@ const taskItemViews = ref<
   >
 >([]);
 const photoPreviewUrls = ref<string[]>([]);
+const photoIdToUrlMap = ref<Map<string, string>>(new Map());
 const isTextSheetOpen = ref(false);
 const isImageSheetOpen = ref(false);
 const isPhotoEditorOpen = ref(false);
@@ -405,8 +422,12 @@ watch(
 
     revokePhotoUrls(photoPreviewUrls.value);
     const photosById = new Map(photos.map((photo) => [photo.id, photo]));
-    const orderedPhotoIds = task?.photo_ids ?? [];
+    const orderedPhotoIds = (task?.photo_ids ?? []).filter((id) => {
+      const photo = photosById.get(id);
+      return photo && !photo.deleted_at; // Only include non-deleted photos
+    });
     const nextPhotoUrls: string[] = [];
+    const nextPhotoIdToUrlMap = new Map<string, string>();
     orderedPhotoIds.forEach((photoId) => {
       const photo = photosById.get(photoId);
       if (photo?.image_blob) {
@@ -417,6 +438,7 @@ watch(
           imageUrl: url,
         });
         nextPhotoUrls.push(url);
+        nextPhotoIdToUrlMap.set(photoId, url);
       } else if (photo?.url) {
         nextViews.push({
           id: photoId,
@@ -424,9 +446,11 @@ watch(
           imageUrl: photo.url,
         });
         nextPhotoUrls.push(photo.url);
+        nextPhotoIdToUrlMap.set(photoId, photo.url);
       }
     });
     photoPreviewUrls.value = nextPhotoUrls;
+    photoIdToUrlMap.value = nextPhotoIdToUrlMap;
 
     const remainingPhotos = photos.filter((photo) => !orderedPhotoIds.includes(photo.id));
     remainingPhotos
@@ -693,6 +717,53 @@ const sendImage = async () => {
   closeImageSheet();
 };
 
+const deletePhoto = async (photoId: string) => {
+  if (!taskRecord.value) return;
+  
+  const timestamp = nowIso();
+  
+  // Soft delete the photo
+  await db.task_photos.update(photoId, {
+    deleted_at: timestamp,
+    updated_at: timestamp,
+  });
+  
+  // Remove photo_id from task's photo_ids array
+  const currentPhotoIds = taskRecord.value.photo_ids ?? [];
+  const updatedPhotoIds = currentPhotoIds.filter((id) => id !== photoId);
+  await db.tasks.update(taskRecord.value.id, {
+    photo_ids: updatedPhotoIds,
+    updated_at: timestamp,
+  });
+  
+  // If photo is already synced to Supabase Storage, delete it from storage
+  const photo = await db.task_photos.get(photoId);
+  if (photo?.storage_path && supabase) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('task-photos')
+        .remove([photo.storage_path]);
+      
+      if (error) {
+        console.error(`[TaskCreateView] Failed to delete photo from Storage:`, error);
+        console.error(`[TaskCreateView] Storage path: ${photo.storage_path}`);
+      } else {
+        console.log(`[TaskCreateView] ✓ Deleted photo from Storage: ${photo.storage_path}`);
+        if (data && data.length > 0) {
+          console.log(`[TaskCreateView] Deleted files:`, data);
+        }
+      }
+    } catch (error) {
+      console.error(`[TaskCreateView] Error deleting photo from Storage:`, error);
+      // Continue even if storage deletion fails - it will be cleaned up later
+    }
+  } else if (photo && !photo.storage_path) {
+    console.log(`[TaskCreateView] Photo not yet synced to Storage (no storage_path), skipping Storage deletion`);
+  } else if (!supabase) {
+    console.log(`[TaskCreateView] Supabase not configured, skipping Storage deletion`);
+  }
+};
+
 // Removed sendAndBack - tasks are saved automatically when adding text/image
 // The close button just navigates back
 
@@ -948,12 +1019,73 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.notes-photo {
+.notes-photo-wrapper {
+  position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
+}
+
+.notes-photo {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   border-radius: 12px;
   display: block;
+}
+
+.notes-photo-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 1; /* Always visible on mobile, hover on desktop */
+  transition: opacity 0.2s, background 0.2s, transform 0.1s;
+  touch-action: manipulation; /* Better touch handling */
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+}
+
+/* Hide on desktop until hover */
+@media (hover: hover) and (pointer: fine) {
+  .notes-photo-delete {
+    opacity: 0;
+  }
+  
+  .notes-photo-wrapper:hover .notes-photo-delete {
+    opacity: 1;
+  }
+  
+  .notes-photo-delete:hover {
+    background: rgba(220, 38, 38, 0.9);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Always visible and larger on mobile/touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .notes-photo-delete {
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.8);
+  }
+  
+  .notes-photo-delete:active {
+    background: rgba(220, 38, 38, 0.95);
+    transform: scale(0.9);
+  }
+}
+
+.notes-photo-delete:active {
+  transform: scale(0.9);
 }
 
 .notes-bottom-bar {
