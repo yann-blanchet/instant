@@ -268,6 +268,7 @@ export async function syncNow(forceFullSync: boolean = false): Promise<void> {
   try {
     let pulledCount = 0;
     let pushedCount = 0;
+    const pushedRecordIds: Record<string, string[]> = {};
 
     // Step 1: Pull latest data from Supabase (in dependency order)
     for (const table of tables) {
@@ -286,10 +287,23 @@ export async function syncNow(forceFullSync: boolean = false): Promise<void> {
     // Step 2: Push local changes to Supabase
     for (const table of tables) {
       try {
+        // Track which records we're about to push
+        const localRecords = await db.table(table).toArray() as Array<{ id: string; updated_at?: string; deleted_at?: string }>;
+        const recordsToSync = state.lastSyncAt
+          ? localRecords.filter((r) => {
+              if (!r.updated_at) return true;
+              if (r.updated_at > state.lastSyncAt!) return true;
+              if (r.deleted_at && r.deleted_at > state.lastSyncAt!) return true;
+              return false;
+            })
+          : localRecords;
+        
         const count = await pushToSupabase(table, state.lastSyncAt);
         if (count) {
           pushedCount += count;
           console.log(`  → ${table}: ${count} pushed`);
+          // Track IDs of records we just pushed
+          pushedRecordIds[table] = recordsToSync.map((r) => r.id);
         }
       } catch (error) {
         console.error(`  ✗ ${table}: push failed`, error);
@@ -297,8 +311,30 @@ export async function syncNow(forceFullSync: boolean = false): Promise<void> {
       }
     }
 
-    // Step 3: Update sync state
-    setSyncState({ lastSyncAt: syncStartTime });
+    // Step 3: After pushing, pull back the records we just pushed to get their updated_at from Supabase
+    // This prevents the sync loop where Supabase's trigger updates updated_at, making records appear "newer"
+    for (const table of tables) {
+      const pushedIds = pushedRecordIds[table];
+      if (pushedIds && pushedIds.length > 0) {
+        const { data } = await supabase
+          .from(table)
+          .select("id, updated_at")
+          .in("id", pushedIds);
+        
+        if (data) {
+          // Update local records with Supabase's updated_at
+          for (const record of data) {
+            await db.table(table).update(record.id, {
+              updated_at: record.updated_at,
+            } as any);
+          }
+        }
+      }
+    }
+
+    // Step 4: Update sync state AFTER both pull and push complete
+    // Use current time to ensure records we just pushed won't be considered "newer" in next sync
+    setSyncState({ lastSyncAt: new Date().toISOString() });
     
     // Summary log
     if (pulledCount > 0 || pushedCount > 0) {
@@ -328,7 +364,6 @@ export async function pullOnly(): Promise<void> {
   // If database is empty, ignore lastSyncAt to pull everything
   const effectiveLastSyncAt = isEmpty ? null : state.lastSyncAt;
   
-  const syncStartTime = new Date().toISOString();
   let pulledCount = 0;
 
   const tables = [
@@ -350,7 +385,8 @@ export async function pullOnly(): Promise<void> {
     }
   }
 
-  setSyncState({ lastSyncAt: syncStartTime });
+  // Update sync state AFTER pull completes
+  setSyncState({ lastSyncAt: new Date().toISOString() });
   
   // Detailed log for pull-only sync
   if (pulledCount > 0) {
@@ -371,6 +407,7 @@ export async function pushOnly(): Promise<void> {
 
   const state = getSyncState();
   let pushedCount = 0;
+  const pushedRecordIds: Record<string, string[]> = {};
 
   const tables = [
     "categories",
@@ -381,18 +418,56 @@ export async function pushOnly(): Promise<void> {
     "task_photos",
   ] as const;
 
+  // Track which records we're about to push, then push them
   for (const table of tables) {
     try {
+      // Track which records we're about to push
+      const localRecords = await db.table(table).toArray() as Array<{ id: string; updated_at?: string; deleted_at?: string }>;
+      const recordsToSync = state.lastSyncAt
+        ? localRecords.filter((r) => {
+            if (!r.updated_at) return true;
+            if (r.updated_at > state.lastSyncAt!) return true;
+            if (r.deleted_at && r.deleted_at > state.lastSyncAt!) return true;
+            return false;
+          })
+        : localRecords;
+      
       const count = await pushToSupabase(table, state.lastSyncAt);
       if (count) {
         pushedCount += count;
         console.log(`  → ${table}: ${count} pushed`);
+        // Track IDs of records we just pushed
+        pushedRecordIds[table] = recordsToSync.map((r) => r.id);
       }
     } catch (error) {
       console.error(`  ✗ ${table}: push failed`, error);
       // Continue with other tables
     }
   }
+
+  // After pushing, pull back the records we just pushed to get their updated_at from Supabase
+  // This prevents the sync loop where Supabase's trigger updates updated_at, making records appear "newer"
+  for (const table of tables) {
+    const pushedIds = pushedRecordIds[table];
+    if (pushedIds && pushedIds.length > 0) {
+      const { data } = await supabase
+        .from(table)
+        .select("id, updated_at")
+        .in("id", pushedIds);
+      
+      if (data) {
+        // Update local records with Supabase's updated_at
+        for (const record of data) {
+          await db.table(table).update(record.id, {
+            updated_at: record.updated_at,
+          } as any);
+        }
+      }
+    }
+  }
+
+  // Update sync state AFTER push completes
+  setSyncState({ lastSyncAt: new Date().toISOString() });
 
   if (pushedCount > 0) {
     console.log(`✓ Push sync: ${pushedCount} records pushed`);
