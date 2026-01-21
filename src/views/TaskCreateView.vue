@@ -778,25 +778,13 @@ const editPhoto = async (photoId: string) => {
 const updateImage = async (photoId: string, newBlob: Blob) => {
   const timestamp = nowIso();
   
-  console.log('[TaskCreateView] Updating photo:', photoId);
-  console.log('[TaskCreateView] Original image size:', (newBlob.size / 1024 / 1024).toFixed(2), 'MB');
-  
-  // Compress the updated image
-  const compressedBlob = await compressImage(newBlob, {
-    maxSizeMB: 0.5,
-    maxWidthOrHeight: 1920,
-    initialQuality: 0.80,
-  });
-  
-  console.log('[TaskCreateView] Compressed image size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
-  
   // Get the photo to check if it was already synced
   const photo = await db.task_photos.get(photoId);
   const wasSynced = !!(photo?.storage_path && photo?.url);
   
-  // Update the photo with new blob
+  // Update immediately with original blob (fast, no compression delay)
   await db.task_photos.update(photoId, {
-    image_blob: compressedBlob,
+    image_blob: newBlob, // Store original first - will be compressed in background
     url: null, // Clear URL since we have a new version
     storage_path: null, // Clear storage path since we need to re-upload
     updated_at: timestamp,
@@ -827,6 +815,24 @@ const updateImage = async (photoId: string, newBlob: Blob) => {
   }
   
   editingPhotoId.value = null;
+  
+  // Compress in background (non-blocking) - update when done
+  compressImage(newBlob, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1920,
+    initialQuality: 0.80,
+  }).then((compressedBlob) => {
+    // Update with compressed version when ready
+    db.task_photos.update(photoId, {
+      image_blob: compressedBlob,
+      updated_at: nowIso(),
+    }).catch((error) => {
+      console.error('[TaskCreateView] Failed to update compressed image:', error);
+    });
+  }).catch((error) => {
+    console.error('[TaskCreateView] Background compression failed:', error);
+    // Keep original if compression fails
+  });
 };
 
 const sendImage = async () => {
@@ -836,25 +842,17 @@ const sendImage = async () => {
   const timestamp = nowIso();
   const photoId = makeId();
   
-  console.log('[TaskCreateView] Original image size:', (imageFile.value.size / 1024 / 1024).toFixed(2), 'MB');
+  // Save the blob before closing the sheet (closeImageSheet sets imageFile.value = null)
+  const originalBlob = imageFile.value;
   
-  // Compress image before storing (reduces storage and improves sync performance)
-  // Optimized for cost: 500KB max, 80% quality (still excellent visual quality)
-  const compressedBlob = await compressImage(imageFile.value, {
-    maxSizeMB: 0.5, // Target 500KB max (cost-optimized)
-    maxWidthOrHeight: 1920, // Limit to 1920px on longest side
-    initialQuality: 0.80, // 80% quality (excellent quality, better compression)
-  });
-  
-  console.log('[TaskCreateView] Compressed image size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
-  
-  // Store photo locally with null URL - it will be uploaded to Storage during sync
+  // Store photo immediately with original blob (fast, no compression delay)
+  // Compression will happen in background for better UX
   await db.task_photos.add({
     id: photoId,
     task_id: taskId,
     url: null,
     storage_path: null,
-    image_blob: compressedBlob,
+    image_blob: originalBlob, // Store original - will be compressed in background
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
@@ -864,6 +862,25 @@ const sendImage = async () => {
   const nextPhotoIds = [...(task?.photo_ids ?? []), photoId];
   await db.tasks.update(taskId, { photo_ids: nextPhotoIds, updated_at: timestamp });
   closeImageSheet();
+  
+  // Compress in background (non-blocking) - update when done
+  // This provides instant feedback while compression happens async
+  compressImage(originalBlob, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1920,
+    initialQuality: 0.80,
+  }).then((compressedBlob) => {
+    // Update with compressed version when ready
+    db.task_photos.update(photoId, {
+      image_blob: compressedBlob,
+      updated_at: nowIso(),
+    }).catch((error) => {
+      console.error('[TaskCreateView] Failed to update compressed image:', error);
+    });
+  }).catch((error) => {
+    console.error('[TaskCreateView] Background compression failed:', error);
+    // Keep original if compression fails
+  });
 };
 
 const deletePhoto = async (photoId: string) => {

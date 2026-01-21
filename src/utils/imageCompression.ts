@@ -33,7 +33,16 @@ export async function compressImage(
   const opts = { ...DEFAULT_OPTIONS, ...options };
   
   const originalSize = file.size;
-  console.log(`[Image Compression] Starting compression: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+  const originalSizeMB = originalSize / 1024 / 1024;
+  
+  // Skip compression if image is already small enough (faster)
+  if (originalSizeMB <= opts.maxSizeMB! * 1.1) {
+    // Image is already close to target size, skip compression
+    console.log(`[Image Compression] Skipping compression: ${originalSizeMB.toFixed(2)}MB (already under ${opts.maxSizeMB}MB target)`);
+    return file instanceof Blob ? file : await file.arrayBuffer().then(b => new Blob([b], { type: file.type || 'image/jpeg' }));
+  }
+  
+  console.log(`[Image Compression] Starting compression: ${originalSizeMB.toFixed(2)}MB`);
   
   // If it's already a Blob, convert to File for the library
   const imageFile = file instanceof File 
@@ -47,6 +56,7 @@ export async function compressImage(
       initialQuality: opts.initialQuality,
       useWebWorker: opts.useWebWorker,
       fileType: opts.fileType,
+      maxIteration: 5, // Limit iterations for faster compression (default is 10)
     });
 
     // The library returns a File, convert to Blob for consistency
