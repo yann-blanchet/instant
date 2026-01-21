@@ -666,10 +666,11 @@ const sendImage = async () => {
   console.log('[TaskCreateView] Original image size:', (imageFile.value.size / 1024 / 1024).toFixed(2), 'MB');
   
   // Compress image before storing (reduces storage and improves sync performance)
+  // Optimized for cost: 500KB max, 80% quality (still excellent visual quality)
   const compressedBlob = await compressImage(imageFile.value, {
-    maxSizeMB: 1, // Target 1MB max
+    maxSizeMB: 0.5, // Target 500KB max (cost-optimized)
     maxWidthOrHeight: 1920, // Limit to 1920px on longest side
-    initialQuality: 0.85, // 85% quality (good balance)
+    initialQuality: 0.80, // 80% quality (excellent quality, better compression)
   });
   
   console.log('[TaskCreateView] Compressed image size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');

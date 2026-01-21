@@ -202,13 +202,13 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
         const imageSizeMB = photo.image_blob.size / 1024 / 1024;
         let blobToUpload = photo.image_blob;
         
-        if (imageSizeMB > 1.1) {
-          // Image is larger than 1MB, compress it
+        if (imageSizeMB > 0.6) {
+          // Image is larger than 600KB, compress it (target is 500KB)
           console.log(`[Sync] Compressing large image before upload: ${imageSizeMB.toFixed(2)}MB`);
           blobToUpload = await compressImage(photo.image_blob, {
-            maxSizeMB: 1,
+            maxSizeMB: 0.5, // Target 500KB max (cost-optimized)
             maxWidthOrHeight: 1920,
-            initialQuality: 0.85,
+            initialQuality: 0.80, // 80% quality
           });
         } else {
           console.log(`[Sync] Image already compressed (${imageSizeMB.toFixed(2)}MB), skipping compression`);

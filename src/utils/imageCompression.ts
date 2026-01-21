@@ -14,9 +14,9 @@ export interface CompressionOptions {
 }
 
 const DEFAULT_OPTIONS: CompressionOptions = {
-  maxSizeMB: 1, // Target 1MB max file size
+  maxSizeMB: 0.5, // Target 500KB max file size (optimized for cost)
   maxWidthOrHeight: 1920, // Limit to 1920px on longest side (good for most displays)
-  initialQuality: 0.85, // 85% quality (good balance between quality and size)
+  initialQuality: 0.80, // 80% quality (good balance - slight reduction for better compression)
   useWebWorker: true, // Use Web Worker to avoid blocking UI
 };
 
