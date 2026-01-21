@@ -41,9 +41,25 @@
           <div
             v-for="(text, index) in taskRecord.observations"
             :key="`obs-${index}`"
-            class="notes-item-text"
+            class="notes-observation-item"
           >
-            {{ text }}
+            <div 
+              class="notes-item-text notes-item-text-editable"
+              @click="editObservation(index)"
+            >
+              {{ text }}
+            </div>
+            <button
+              class="notes-observation-delete"
+              type="button"
+              aria-label="Delete observation"
+              @click.stop="deleteObservation(index)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -71,14 +87,15 @@
           >
             <img
               :src="photoIdToUrlMap.get(photoId)"
-              class="notes-photo"
+              class="notes-photo notes-photo-editable"
               alt="Task photo"
+              @click="editPhoto(photoId)"
             />
             <button
               class="notes-photo-delete"
               type="button"
               aria-label="Delete photo"
-              @click="deletePhoto(photoId)"
+              @click.stop="deletePhoto(photoId)"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -373,11 +390,13 @@ const isImageSheetOpen = ref(false);
 const isPhotoEditorOpen = ref(false);
 const photoEditorSource = ref("");
 const textDraft = ref("");
+const editingObservationIndex = ref<number | null>(null);
 const imageFile = ref<File | Blob | null>(null);
 const imagePreviewUrl = ref<string | null>(null);
 const imageInput = ref<HTMLInputElement | null>(null);
 const textAreaRef = ref<HTMLTextAreaElement | null>(null);
 const contentListRef = ref<HTMLDivElement | null>(null);
+const editingPhotoId = ref<string | null>(null);
 
 const hasContent = computed(() => {
   const observationsCount = taskRecord.value?.observations?.length ?? 0;
@@ -574,15 +593,33 @@ watch(
   },
 );
 
-const openTextSheet = async () => {
+const openTextSheet = async (observationIndex?: number) => {
+  if (observationIndex !== undefined && taskRecord.value) {
+    // Editing existing observation
+    editingObservationIndex.value = observationIndex;
+    textDraft.value = taskRecord.value.observations[observationIndex] || "";
+  } else {
+    // Adding new observation
+    editingObservationIndex.value = null;
+    textDraft.value = "";
+  }
   isTextSheetOpen.value = true;
   await nextTick();
   textAreaRef.value?.focus();
+  // Select all text when editing
+  if (observationIndex !== undefined && textAreaRef.value) {
+    textAreaRef.value.select();
+  }
+};
+
+const editObservation = (index: number) => {
+  openTextSheet(index);
 };
 
 const closeTextSheet = () => {
   isTextSheetOpen.value = false;
   textDraft.value = "";
+  editingObservationIndex.value = null;
 };
 
 const ensureOngoingVisit = async () => {
@@ -614,12 +651,40 @@ const sendText = async () => {
   const visitId = await ensureOngoingVisit();
   const taskId = await ensureTask(visitId);
   const task = await db.tasks.get(taskId);
-  const nextObservations = [...(task?.observations ?? []), textDraft.value.trim()];
-  await db.tasks.update(taskId, {
-    observations: nextObservations,
+  
+  if (editingObservationIndex.value !== null && task) {
+    // Editing existing observation
+    const currentObservations = [...(task.observations ?? [])];
+    if (editingObservationIndex.value >= 0 && editingObservationIndex.value < currentObservations.length) {
+      currentObservations[editingObservationIndex.value] = textDraft.value.trim();
+      await db.tasks.update(taskId, {
+        observations: currentObservations,
+        updated_at: nowIso(),
+      });
+    }
+  } else {
+    // Adding new observation
+    const nextObservations = [...(task?.observations ?? []), textDraft.value.trim()];
+    await db.tasks.update(taskId, {
+      observations: nextObservations,
+      updated_at: nowIso(),
+    });
+  }
+  
+  closeTextSheet();
+};
+
+const deleteObservation = async (index: number) => {
+  if (!taskRecord.value) return;
+  
+  const currentObservations = taskRecord.value.observations ?? [];
+  if (index < 0 || index >= currentObservations.length) return;
+  
+  const updatedObservations = currentObservations.filter((_, i) => i !== index);
+  await db.tasks.update(taskRecord.value.id, {
+    observations: updatedObservations,
     updated_at: nowIso(),
   });
-  closeTextSheet();
 };
 
 const openImagePicker = () => {
@@ -662,6 +727,7 @@ const closePhotoEditor = () => {
   }
   photoEditorSource.value = "";
   isPhotoEditorOpen.value = false;
+  editingPhotoId.value = null; // Reset editing state
 };
 
 const handlePhotoUpdated = async (dataUrl: string) => {
@@ -676,8 +742,91 @@ const handlePhotoEdited = async (dataUrl: string) => {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   imageFile.value = blob;
+  
+  // Check if editing before closing editor (closePhotoEditor resets editingPhotoId)
+  const photoIdToUpdate = editingPhotoId.value;
   closePhotoEditor();
-  await sendImage();
+  
+  if (photoIdToUpdate) {
+    // Editing existing photo
+    await updateImage(photoIdToUpdate, blob);
+  } else {
+    // Adding new photo
+    await sendImage();
+  }
+};
+
+const editPhoto = async (photoId: string) => {
+  const photo = await db.task_photos.get(photoId);
+  if (!photo) return;
+  
+  editingPhotoId.value = photoId;
+  
+  // Load the photo into the editor
+  if (photo.image_blob) {
+    // Use local blob
+    const url = URL.createObjectURL(photo.image_blob);
+    photoEditorSource.value = url;
+    isPhotoEditorOpen.value = true;
+  } else if (photo.url) {
+    // Use URL from Supabase Storage
+    photoEditorSource.value = photo.url;
+    isPhotoEditorOpen.value = true;
+  }
+};
+
+const updateImage = async (photoId: string, newBlob: Blob) => {
+  const timestamp = nowIso();
+  
+  console.log('[TaskCreateView] Updating photo:', photoId);
+  console.log('[TaskCreateView] Original image size:', (newBlob.size / 1024 / 1024).toFixed(2), 'MB');
+  
+  // Compress the updated image
+  const compressedBlob = await compressImage(newBlob, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1920,
+    initialQuality: 0.80,
+  });
+  
+  console.log('[TaskCreateView] Compressed image size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+  
+  // Get the photo to check if it was already synced
+  const photo = await db.task_photos.get(photoId);
+  const wasSynced = !!(photo?.storage_path && photo?.url);
+  
+  // Update the photo with new blob
+  await db.task_photos.update(photoId, {
+    image_blob: compressedBlob,
+    url: null, // Clear URL since we have a new version
+    storage_path: null, // Clear storage path since we need to re-upload
+    updated_at: timestamp,
+  });
+  
+  // If it was synced, delete the old file from Storage
+  if (wasSynced && photo?.storage_path && supabase) {
+    try {
+      const { error } = await supabase.storage
+        .from('task-photos')
+        .remove([photo.storage_path]);
+      
+      if (error) {
+        console.error(`[TaskCreateView] Failed to delete old photo from Storage:`, error);
+      } else {
+        console.log(`[TaskCreateView] ✓ Deleted old photo from Storage: ${photo.storage_path}`);
+      }
+    } catch (error) {
+      console.error(`[TaskCreateView] Error deleting old photo from Storage:`, error);
+    }
+  }
+  
+  // Update task timestamp
+  if (taskRecord.value) {
+    await db.tasks.update(taskRecord.value.id, {
+      updated_at: timestamp,
+    });
+  }
+  
+  editingPhotoId.value = null;
 };
 
 const sendImage = async () => {
@@ -995,10 +1144,92 @@ onBeforeUnmount(() => {
   border-bottom: none;
 }
 
+.notes-observation-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+}
+
 .notes-item-text {
   white-space: pre-wrap;
   color: var(--notes-text);
   font-size: 14px;
+  flex: 1;
+  line-height: 1.5;
+}
+
+.notes-item-text-editable {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.notes-item-text-editable:hover {
+  background: var(--notes-hover);
+}
+
+.notes-item-text-editable:active {
+  background: var(--notes-panel-strong);
+}
+
+.notes-observation-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--notes-border);
+  color: var(--notes-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 1; /* Always visible on mobile, hover on desktop */
+  transition: opacity 0.2s, background 0.2s, border-color 0.2s, transform 0.1s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide on desktop until hover */
+@media (hover: hover) and (pointer: fine) {
+  .notes-observation-delete {
+    opacity: 0;
+  }
+  
+  .notes-observation-item:hover .notes-observation-delete {
+    opacity: 1;
+  }
+  
+  .notes-observation-delete:hover {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.3);
+    color: #dc2626;
+  }
+}
+
+/* Always visible and larger on mobile/touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .notes-observation-delete {
+    opacity: 1;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+  
+  .notes-observation-delete:active {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.4);
+    color: #dc2626;
+    transform: scale(0.9);
+  }
+}
+
+.notes-observation-delete:active {
+  transform: scale(0.9);
 }
 
 .notes-item-image {
@@ -1010,7 +1241,7 @@ onBeforeUnmount(() => {
 .notes-observation-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
 }
 
 .notes-photo-grid {
@@ -1031,6 +1262,21 @@ onBeforeUnmount(() => {
   object-fit: cover;
   border-radius: 12px;
   display: block;
+}
+
+.notes-photo-editable {
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.notes-photo-editable:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.notes-photo-editable:active {
+  opacity: 0.8;
+  transform: scale(0.98);
 }
 
 .notes-photo-delete {
