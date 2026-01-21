@@ -270,7 +270,7 @@
         </p>
         <details style="margin-top: 12px;">
           <summary style="cursor: pointer; color: var(--notes-text); font-size: 13px; padding: 8px 0;">
-            Advanced: Manual Sync
+            Advanced: Manual Sync & Cleanup
           </summary>
           <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
             <button class="notes-button" type="button" @click="runSync">
@@ -278,6 +278,9 @@
             </button>
             <button class="notes-button" type="button" @click="runFullSync" style="font-size: 12px;">
               Full Sync (All Data)
+            </button>
+            <button class="notes-button" type="button" @click="runCleanup" style="font-size: 12px; color: var(--notes-muted);">
+              Cleanup Deleted (30+ days)
             </button>
           </div>
         </details>
@@ -294,6 +297,7 @@ import { db } from "../db";
 import type { Category, Intervenant } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
 import { syncNow } from "../services/sync";
+import { cleanupDeletedRecords } from "../services/cleanup";
 import CategoryBadge from "../components/CategoryBadge.vue";
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
@@ -453,6 +457,19 @@ const runFullSync = async () => {
   } catch (error) {
     console.error("Full sync error:", error);
     alert(`Full sync failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+const runCleanup = async () => {
+  if (!confirm("Permanently delete records soft-deleted more than 30 days ago? This cannot be undone.")) {
+    return;
+  }
+  try {
+    await cleanupDeletedRecords(30);
+    alert("Cleanup completed! Check console for details.");
+  } catch (error) {
+    console.error("Cleanup error:", error);
+    alert(`Cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 

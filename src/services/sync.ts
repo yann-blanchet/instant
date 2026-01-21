@@ -277,6 +277,9 @@ export async function syncNow(forceFullSync: boolean = false): Promise<void> {
       if (pulledData.length > 0 || deletedIds.length > 0) {
         await applyPulledData(table, pulledData, deletedIds);
         pulledCount += pulledData.length;
+        if (pulledData.length > 0) {
+          console.log(`  → ${table}: ${pulledData.length} pulled`);
+        }
       }
     }
 
@@ -284,9 +287,12 @@ export async function syncNow(forceFullSync: boolean = false): Promise<void> {
     for (const table of tables) {
       try {
         const count = await pushToSupabase(table, state.lastSyncAt);
-        if (count) pushedCount += count;
+        if (count) {
+          pushedCount += count;
+          console.log(`  → ${table}: ${count} pushed`);
+        }
       } catch (error) {
-        console.error(`Failed to push ${table}:`, error);
+        console.error(`  ✗ ${table}: push failed`, error);
         // Continue with other tables even if one fails
       }
     }
@@ -378,15 +384,19 @@ export async function pushOnly(): Promise<void> {
   for (const table of tables) {
     try {
       const count = await pushToSupabase(table, state.lastSyncAt);
-      if (count) pushedCount += count;
+      if (count) {
+        pushedCount += count;
+        console.log(`  → ${table}: ${count} pushed`);
+      }
     } catch (error) {
-      console.error(`Failed to push ${table}:`, error);
+      console.error(`  ✗ ${table}: push failed`, error);
       // Continue with other tables
     }
   }
 
-  // Only log if there were actual changes pushed
-  // (silent if no changes to avoid noise)
+  if (pushedCount > 0) {
+    console.log(`✓ Push sync: ${pushedCount} records pushed`);
+  }
 }
 
 /**
