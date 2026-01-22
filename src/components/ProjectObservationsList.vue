@@ -9,7 +9,7 @@
           type="button"
           @click="filterMode = 'date'"
         >
-          Non assignée
+          Non assignée <span class="notes-count-badge">{{ unassignedTasksCount }}</span>
         </button>
         <button
           class="notes-filter-badge"
@@ -82,6 +82,7 @@
           @add-photo="$emit('add-photo', $event)"
           @edit-photo="$emit('edit-photo', $event)"
           @manage-observations="$emit('manage-observations', $event)"
+          @assign-intervenant="$emit('assign-intervenant', $event)"
         />
       </template>
     </div>
@@ -153,6 +154,10 @@ const filteredTasks = computed(() => {
 
 const assignedTasks = computed(() => {
   return filteredTasks.value.filter((task) => task.intervenant_id != null);
+});
+
+const unassignedTasksCount = computed(() => {
+  return filteredTasks.value.filter((task) => !task.intervenant_id).length;
 });
 
 const sortedTasks = computed(() => {

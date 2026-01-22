@@ -1,5 +1,28 @@
 <template>
   <div class="notes-row notes-task-row">
+    <div class="notes-task-header">
+      <div class="notes-row-meta">
+        <span>{{ formatRelativeTime(task.updated_at) }}</span>
+      </div>
+      <div class="notes-task-header-actions">
+        <button
+          class="notes-task-assign"
+          type="button"
+          @click.stop="$emit('assign-intervenant', task)"
+          aria-label="Assign intervenant"
+        >
+          Assign
+        </button>
+        <button
+          class="notes-task-menu"
+          type="button"
+          @click.stop.prevent="$emit('task-menu-click', task)"
+          aria-label="Task actions"
+        >
+          ⋯
+        </button>
+      </div>
+    </div>
     <div class="notes-row-text">
       <div class="notes-section">
         <div class="notes-section-header">
@@ -61,19 +84,6 @@
           />
         </div>
       </div>
-    </div>
-    <div class="notes-task-footer">
-      <div class="notes-row-meta">
-        <span>{{ formatRelativeTime(task.updated_at) }}</span>
-      </div>
-      <button
-        class="notes-task-menu"
-        type="button"
-        @click.stop.prevent="$emit('task-menu-click', task)"
-        aria-label="Task actions"
-      >
-        ⋯
-      </button>
     </div>
   </div>
 </template>
@@ -142,20 +152,19 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   min-height: 60px;
 }
 
-.notes-task-footer {
+.notes-task-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 4px;
   padding-bottom: 4px;
-  border-top: 1px solid var(--notes-border);
-  margin-top: 8px;
+  border-bottom: 1px solid var(--notes-border);
   margin-left: -12px;
   margin-right: -12px;
-  margin-bottom: -10px;
+  margin-top: -10px;
   padding-left: 12px;
   padding-right: 12px;
+  padding-top: 4px;
   min-height: 20px;
 }
 
@@ -198,6 +207,30 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   opacity: 0.7;
 }
 
+
+.notes-task-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notes-task-assign {
+  background: transparent;
+  border: 1px solid var(--notes-border);
+  color: var(--notes-text);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-assign:hover {
+  background: var(--notes-hover);
+  border-color: var(--notes-accent);
+}
 
 .notes-task-menu {
   background: transparent;
