@@ -77,6 +77,12 @@
       </button>
     </div>
 
+    <ImagePicker
+      ref="imagePickerRef"
+      @image-selected="handleImageSelected"
+      @cancel="handleImageCancel"
+    />
+
     <div
       v-if="isTaskActionsSheetOpen"
       class="notes-sheet-backdrop"
@@ -288,6 +294,12 @@
         </div>
       </div>
     </div>
+
+    <TextSheet
+      v-model="isTextSheetOpen"
+      @send="handleTextSend"
+      @close="closeTextSheet"
+    />
   </section>
 </template>
 
@@ -298,8 +310,10 @@ import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
+import ImagePicker from "../components/ImagePicker.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import ProjectObservationsList from "../components/ProjectObservationsList.vue";
+import TextSheet from "../components/TextSheet.vue";
 import type { Category, Intervenant, Task, TaskPhoto } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
 import { makeId, nowIso, todayIso } from "../utils/time";
@@ -318,6 +332,8 @@ const taskActionsTask = ref<Task | null>(null);
 const isImageModalOpen = ref(false);
 const selectedImageUrl = ref<string | null>(null);
 const projectIntervenantIds = ref<string[]>([]);
+const isTextSheetOpen = ref(false);
+const imagePickerRef = ref<InstanceType<typeof ImagePicker> | null>(null);
 
 
 const project = useLiveQuery(
@@ -642,11 +658,119 @@ const openTask = (task: Task) => {
 };
 
 const openAddTaskWithText = () => {
-  router.push(`/projects/${props.id}/tasks/new?action=text`);
+  isTextSheetOpen.value = true;
 };
 
 const openAddTaskWithImage = () => {
-  router.push(`/projects/${props.id}/tasks/new?action=image`);
+  imagePickerRef.value?.open();
+};
+
+const handleImageSelected = async (blob: Blob) => {
+  const visitId = await ensureOngoingVisit();
+  const timestamp = nowIso();
+  const taskId = makeId();
+  const photoId = makeId();
+  
+  // Create task with the photo
+  await db.tasks.add({
+    id: taskId,
+    project_id: props.id,
+    visit_id: visitId,
+    opened_visit_id: visitId,
+    done_visit_id: null,
+    status: "open",
+    intervenant_id: null, // Unassigned by default
+    audio_url: null,
+    photo_ids: [photoId],
+    observations: [],
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
+  
+  // Store photo with original blob (compression will happen in background during sync)
+  await db.task_photos.add({
+    id: photoId,
+    task_id: taskId,
+    url: null,
+    storage_path: null,
+    image_blob: blob,
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
+  
+  // Compress in background (non-blocking)
+  const { compressImage } = await import("../utils/imageCompression");
+  compressImage(blob, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1920,
+    initialQuality: 0.80,
+  }).then((compressedBlob) => {
+    db.task_photos.update(photoId, {
+      image_blob: compressedBlob,
+      updated_at: nowIso(),
+    }).catch((error) => {
+      console.error('[ProjectView] Failed to update compressed image:', error);
+    });
+  }).catch((error) => {
+    console.error('[ProjectView] Background compression failed:', error);
+  });
+};
+
+const handleImageCancel = () => {
+  // User cancelled image selection - nothing to do
+};
+
+const closeTextSheet = () => {
+  isTextSheetOpen.value = false;
+};
+
+const ensureOngoingVisit = async () => {
+  if (!props.id) return null;
+  const existing = await db.visits
+    .filter((visit) => visit.project_id === props.id && !visit.ended_at)
+    .first();
+  if (existing) return existing.id;
+
+  const timestamp = nowIso();
+  const visitNumber = await getNextVisitNumber(props.id);
+  const visitId = makeId();
+  await db.visits.add({
+    id: visitId,
+    project_id: props.id,
+    date: todayIso(),
+    conclusion: "",
+    visit_number: visitNumber,
+    ended_at: null,
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
+  return visitId;
+};
+
+const handleTextSend = async (text: string) => {
+  const visitId = await ensureOngoingVisit();
+  const timestamp = nowIso();
+  const taskId = makeId();
+  
+  // Create task with the observation
+  await db.tasks.add({
+    id: taskId,
+    project_id: props.id,
+    visit_id: visitId,
+    opened_visit_id: visitId,
+    done_visit_id: null,
+    status: "open",
+    intervenant_id: null, // Unassigned by default
+    audio_url: null,
+    photo_ids: [],
+    observations: [text],
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+  });
 };
 
 onBeforeUnmount(() => {
@@ -1357,6 +1481,11 @@ const deleteTask = async (task: Task) => {
   padding: 8px 14px;
   border-radius: 999px;
   font-size: 13px;
+}
+
+.notes-button-primary {
+  background: var(--notes-accent);
+  color: #fff;
 }
 
 .notes-button-primary {

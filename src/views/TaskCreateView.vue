@@ -131,75 +131,21 @@
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
-      <input
-        ref="imageInput"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        class="notes-hidden-input"
-        @change="handleImagePicked"
-      />
     </div>
 
-    <div v-if="isTextSheetOpen" class="notes-sheet-backdrop" @click="closeTextSheet">
-      <div class="notes-sheet" @click.stop>
-        <textarea
-          ref="textAreaRef"
-          v-model="textDraft"
-          class="notes-sheet-textarea"
-          rows="4"
-          placeholder="Écrire un texte..."
-        />
-        <div class="notes-sheet-actions">
-          <button class="notes-button" type="button" @click="closeTextSheet">Cancel</button>
-          <button
-            class="notes-button notes-button-primary"
-            type="button"
-            aria-label="Send text"
-            @click="sendText"
-          >
-            <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M5 12h14M15 6l4 6-4 6"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <ImagePicker
+      ref="imagePickerRef"
+      @image-selected="handleImageSelected"
+      @cancel="handleImageCancel"
+    />
 
-    <div v-if="isImageSheetOpen" class="notes-sheet-backdrop" @click="closeImageSheet">
-      <div class="notes-sheet" @click.stop>
-        <div class="notes-image-preview">
-          <img v-if="imagePreviewUrl" :src="imagePreviewUrl" alt="Preview" />
-        </div>
-        <div class="notes-sheet-actions">
-          <button class="notes-button" type="button" @click="closeImageSheet">Cancel</button>
-          <button
-            class="notes-button notes-button-primary"
-            type="button"
-            aria-label="Send image"
-            @click="sendImage"
-          >
-            <svg class="notes-send-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M5 12h14M15 6l4 6-4 6"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.8"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
+    <TextSheet
+      v-model="isTextSheetOpen"
+      :initial-text="textDraft"
+      @send="handleTextSend"
+      @close="closeTextSheet"
+    />
+
 
     <div
       v-if="isAssigneeSheetOpen"
@@ -260,7 +206,9 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import type { Task, TaskPhoto } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
+import ImagePicker from "../components/ImagePicker.vue";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
+import TextSheet from "../components/TextSheet.vue";
 import { compressImage } from "../utils/imageCompression";
 import { supabase } from "../supabase";
 
@@ -386,15 +334,11 @@ const taskItemViews = ref<
 const photoPreviewUrls = ref<string[]>([]);
 const photoIdToUrlMap = ref<Map<string, string>>(new Map());
 const isTextSheetOpen = ref(false);
-const isImageSheetOpen = ref(false);
 const isPhotoEditorOpen = ref(false);
 const photoEditorSource = ref("");
 const textDraft = ref("");
 const editingObservationIndex = ref<number | null>(null);
-const imageFile = ref<File | Blob | null>(null);
-const imagePreviewUrl = ref<string | null>(null);
-const imageInput = ref<HTMLInputElement | null>(null);
-const textAreaRef = ref<HTMLTextAreaElement | null>(null);
+const imagePickerRef = ref<InstanceType<typeof ImagePicker> | null>(null);
 const contentListRef = ref<HTMLDivElement | null>(null);
 const editingPhotoId = ref<string | null>(null);
 
@@ -404,12 +348,6 @@ const hasContent = computed(() => {
   return observationsCount + photoCount > 0;
 });
 
-const revokePreview = () => {
-  if (imagePreviewUrl.value) {
-    URL.revokeObjectURL(imagePreviewUrl.value);
-    imagePreviewUrl.value = null;
-  }
-};
 
 const revokePhotoUrls = (urls: string[]) => {
   urls.forEach((url) => {
@@ -593,7 +531,7 @@ watch(
   },
 );
 
-const openTextSheet = async (observationIndex?: number) => {
+const openTextSheet = (observationIndex?: number) => {
   if (observationIndex !== undefined && taskRecord.value) {
     // Editing existing observation
     editingObservationIndex.value = observationIndex;
@@ -604,12 +542,6 @@ const openTextSheet = async (observationIndex?: number) => {
     textDraft.value = "";
   }
   isTextSheetOpen.value = true;
-  await nextTick();
-  textAreaRef.value?.focus();
-  // Select all text when editing
-  if (observationIndex !== undefined && textAreaRef.value) {
-    textAreaRef.value.select();
-  }
 };
 
 const editObservation = (index: number) => {
@@ -646,8 +578,7 @@ const ensureOngoingVisit = async () => {
   return visitId;
 };
 
-const sendText = async () => {
-  if (!textDraft.value.trim()) return;
+const handleTextSend = async (text: string) => {
   const visitId = await ensureOngoingVisit();
   const taskId = await ensureTask(visitId);
   const task = await db.tasks.get(taskId);
@@ -656,7 +587,7 @@ const sendText = async () => {
     // Editing existing observation
     const currentObservations = [...(task.observations ?? [])];
     if (editingObservationIndex.value >= 0 && editingObservationIndex.value < currentObservations.length) {
-      currentObservations[editingObservationIndex.value] = textDraft.value.trim();
+      currentObservations[editingObservationIndex.value] = text;
       await db.tasks.update(taskId, {
         observations: currentObservations,
         updated_at: nowIso(),
@@ -664,7 +595,7 @@ const sendText = async () => {
     }
   } else {
     // Adding new observation
-    const nextObservations = [...(task?.observations ?? []), textDraft.value.trim()];
+    const nextObservations = [...(task?.observations ?? []), text];
     await db.tasks.update(taskId, {
       observations: nextObservations,
       updated_at: nowIso(),
@@ -688,7 +619,7 @@ const deleteObservation = async (index: number) => {
 };
 
 const openImagePicker = () => {
-  imageInput.value?.click();
+  imagePickerRef.value?.open();
 };
 
 // Handle query parameter actions
@@ -705,20 +636,19 @@ onMounted(() => {
   }
 });
 
-const handleImagePicked = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-  photoEditorSource.value = URL.createObjectURL(file);
-  isPhotoEditorOpen.value = true;
-  isImageSheetOpen.value = false;
-  input.value = "";
+const handleImageSelected = async (blob: Blob) => {
+  // For new images (not editing), use sendImage logic
+  if (!editingPhotoId.value) {
+    await sendImage(blob);
+  } else {
+    // For editing existing images, use updateImage logic
+    await updateImage(editingPhotoId.value, blob);
+  }
 };
 
-const closeImageSheet = () => {
-  isImageSheetOpen.value = false;
-  imageFile.value = null;
-  revokePreview();
+const handleImageCancel = () => {
+  // Reset editing state if user cancelled
+  editingPhotoId.value = null;
 };
 
 const closePhotoEditor = () => {
@@ -731,17 +661,13 @@ const closePhotoEditor = () => {
 };
 
 const handlePhotoUpdated = async (dataUrl: string) => {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  imageFile.value = blob;
-  revokePreview();
-  imagePreviewUrl.value = dataUrl;
+  // This is called when user updates image in PhotoEditorModal (for editing existing photos)
+  // The actual save happens in handlePhotoEdited when user clicks "Save"
 };
 
 const handlePhotoEdited = async (dataUrl: string) => {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
-  imageFile.value = blob;
   
   // Check if editing before closing editor (closePhotoEditor resets editingPhotoId)
   const photoIdToUpdate = editingPhotoId.value;
@@ -751,8 +677,8 @@ const handlePhotoEdited = async (dataUrl: string) => {
     // Editing existing photo
     await updateImage(photoIdToUpdate, blob);
   } else {
-    // Adding new photo
-    await sendImage();
+    // Adding new photo (shouldn't happen via PhotoEditorModal, but handle it)
+    await sendImage(blob);
   }
 };
 
@@ -835,15 +761,11 @@ const updateImage = async (photoId: string, newBlob: Blob) => {
   });
 };
 
-const sendImage = async () => {
-  if (!imageFile.value) return;
+const sendImage = async (blob: Blob) => {
   const visitId = await ensureOngoingVisit();
   const taskId = await ensureTask(visitId);
   const timestamp = nowIso();
   const photoId = makeId();
-  
-  // Save the blob before closing the sheet (closeImageSheet sets imageFile.value = null)
-  const originalBlob = imageFile.value;
   
   // Store photo immediately with original blob (fast, no compression delay)
   // Compression will happen in background for better UX
@@ -852,7 +774,7 @@ const sendImage = async () => {
     task_id: taskId,
     url: null,
     storage_path: null,
-    image_blob: originalBlob, // Store original - will be compressed in background
+    image_blob: blob, // Store original - will be compressed in background
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
@@ -861,11 +783,10 @@ const sendImage = async () => {
   const task = await db.tasks.get(taskId);
   const nextPhotoIds = [...(task?.photo_ids ?? []), photoId];
   await db.tasks.update(taskId, { photo_ids: nextPhotoIds, updated_at: timestamp });
-  closeImageSheet();
   
   // Compress in background (non-blocking) - update when done
   // This provides instant feedback while compression happens async
-  compressImage(originalBlob, {
+  compressImage(blob, {
     maxSizeMB: 0.5,
     maxWidthOrHeight: 1920,
     initialQuality: 0.80,
@@ -947,7 +868,6 @@ onBeforeUnmount(() => {
     if (item.type === "image") URL.revokeObjectURL(item.imageUrl);
   });
   revokePhotoUrls(photoPreviewUrls.value);
-  revokePreview();
   taskItemsSubscription?.unsubscribe();
 });
 </script>
