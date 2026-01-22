@@ -95,53 +95,19 @@
       @click="closeTaskActionsSheet"
     >
       <div class="notes-sheet" @click.stop>
-        <div class="notes-sheet-title">Task actions</div>
-        <div class="notes-list">
-          <div class="notes-sheet-section-label">Assign</div>
-          <div class="notes-sheet-chips">
-            <button
-              class="notes-sheet-chip"
-              type="button"
-              :class="{ active: !taskActionsTask?.intervenant_id }"
-              @click="handleTaskActionAssignToIntervenant(null)"
-            >
-              Générale
-            </button>
-            <button
-              v-for="intervenant in projectIntervenantsList"
-              :key="intervenant.id"
-              class="notes-sheet-chip"
-              :class="{ active: taskActionsTask?.intervenant_id === intervenant.id }"
-              :style="getIntervenantCategories(intervenant).length > 0 && getIntervenantCategories(intervenant)[0]?.color ? { borderColor: getIntervenantCategories(intervenant)[0].color } : {}"
-              type="button"
-              @click="handleTaskActionAssignToIntervenant(intervenant.id)"
-            >
-              <div class="notes-sheet-chip-content">
-                <div class="notes-sheet-chip-name">{{ intervenant.name }}</div>
-                <div v-if="getIntervenantCategories(intervenant).length > 0" class="notes-sheet-chip-category">
-                  {{ getIntervenantCategories(intervenant)[0].name }}
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-        <div class="notes-sheet-actions">
-          <button class="notes-button" type="button" @click="closeTaskActionsSheet">
-            Cancel
-          </button>
-          <button
-            class="notes-button"
-            type="button"
-            @click="handleTaskActionToggleStatus"
-          >
+        <div class="notes-list notes-task-actions-list">
+          <button class="notes-sheet-row" type="button" @click="handleTaskActionToggleStatus">
             {{ taskActionsTask?.status === "done" ? "Mark as open" : "Mark as done" }}
           </button>
           <button
-            class="notes-button notes-button-danger"
+            class="notes-sheet-row notes-sheet-row-danger"
             type="button"
             @click="handleTaskActionDelete"
           >
             Delete
+          </button>
+          <button class="notes-sheet-row" type="button" @click="closeTaskActionsSheet">
+            Cancel
           </button>
         </div>
       </div>
@@ -1482,6 +1448,10 @@ const deleteTask = async (task: Task) => {
   border-radius: 12px;
   text-align: left;
   font-weight: 600;
+}
+
+.notes-task-actions-list .notes-sheet-row + .notes-sheet-row {
+  margin-top: 8px;
 }
 
 .notes-sheet-row.active {
