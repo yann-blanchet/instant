@@ -1,49 +1,5 @@
 <template>
   <div class="notes-row notes-task-row">
-    <div class="notes-task-header">
-      <div class="notes-task-header-left">
-        <div class="notes-row-meta" @click.stop="$emit('assign-intervenant', task)">
-          <span v-if="showAssigneeMeta && getTaskAssignee(task)" class="notes-assignee-meta notes-clickable">
-            {{ getTaskAssignee(task)?.name }}
-          </span>
-          <span v-else-if="showAssigneeMeta" class="notes-assignee-meta notes-clickable">
-            {{ UNASSIGNED_LABEL }}
-          </span>
-        </div>
-        <div
-          v-if="showCategoryBadges && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || (!getTaskAssignee(task) && showUnassignedBadge))"
-          class="notes-task-category-badges"
-          @click.stop="$emit('assign-intervenant', task)"
-        >
-          <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-            <CategoryBadge
-              v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-              :key="category.id"
-              :category="category"
-              variant="task"
-            />
-          </template>
-        <CategoryBadge
-          v-else-if="!getTaskAssignee(task) && showUnassignedBadge"
-          :label="UNASSIGNED_LABEL"
-          variant="task"
-        />
-        </div>
-      </div>
-      <div class="notes-task-header-right">
-        <div class="notes-row-meta">
-          <span>{{ formatRelativeTime(task.updated_at) }}</span>
-        </div>
-        <button
-          class="notes-task-menu"
-          type="button"
-          @click.stop.prevent="$emit('task-menu-click', task)"
-          aria-label="Task actions"
-        >
-          ⋯
-        </button>
-      </div>
-    </div>
     <div class="notes-row-text">
       <div class="notes-section">
         <div class="notes-section-header">
@@ -105,6 +61,19 @@
           />
         </div>
       </div>
+    </div>
+    <div class="notes-task-footer">
+      <div class="notes-row-meta">
+        <span>{{ formatRelativeTime(task.updated_at) }}</span>
+      </div>
+      <button
+        class="notes-task-menu"
+        type="button"
+        @click.stop.prevent="$emit('task-menu-click', task)"
+        aria-label="Task actions"
+      >
+        ⋯
+      </button>
     </div>
   </div>
 </template>
@@ -173,34 +142,21 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   min-height: 60px;
 }
 
-.notes-task-header {
+.notes-task-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--notes-border);
-  flex-wrap: wrap;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  border-radius: 8px 8px 0 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-top: 1px solid var(--notes-border);
+  margin-top: 8px;
   margin-left: -12px;
   margin-right: -12px;
-  margin-top: -10px;
+  margin-bottom: -10px;
   padding-left: 12px;
   padding-right: 12px;
-  padding-top: 10px;
-}
-
-.notes-task-header:hover {
-  background: var(--notes-hover);
-}
-
-.notes-task-category-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  cursor: pointer;
+  min-height: 20px;
 }
 
 .notes-row-text {
@@ -226,9 +182,6 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   color: var(--notes-muted);
 }
 
-.notes-task-header .notes-row-meta:last-of-type {
-  margin-left: auto;
-}
 
 .notes-assignee-meta {
   font-size: 11px;
@@ -245,18 +198,6 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   opacity: 0.7;
 }
 
-.notes-task-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-
-.notes-task-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
 .notes-task-menu {
   background: transparent;
