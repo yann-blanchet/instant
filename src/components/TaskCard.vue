@@ -6,33 +6,11 @@
         <span>{{ formatRelativeTime(task.updated_at) }}</span>
       </div>
       <div class="notes-task-header-actions">
+        <template v-if="showAssigneeMeta && task.intervenant_id">
+          <span class="notes-assignee-meta">{{ getTaskAssignee(task)?.name || 'Unknown' }}</span>
+        </template>
         <button
-          class="notes-task-header-icon"
-          type="button"
-          @click.stop="$emit('add-text', task)"
-          aria-label="Add text observation"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
-          </svg>
-        </button>
-        <button
-          class="notes-task-header-icon"
-          type="button"
-          @click.stop="$emit('add-photo', task)"
-          aria-label="Add photo"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-            <polyline points="21 15 16 10 5 21"></polyline>
-          </svg>
-        </button>
-        <button
+          v-else
           class="notes-task-assign"
           type="button"
           @click.stop="$emit('assign-intervenant', task)"
@@ -49,6 +27,34 @@
           ⋯
         </button>
       </div>
+    </div>
+    <div v-if="task.status === 'open'" class="notes-task-secondary-row">
+      <button
+        class="notes-task-secondary-action"
+        type="button"
+        @click.stop="$emit('add-text', task)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span>Add note</span>
+      </button>
+      <button
+        class="notes-task-secondary-action"
+        type="button"
+        @click.stop="$emit('add-photo', task)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        <span>Add photo</span>
+      </button>
     </div>
     <div class="notes-row-text">
       <div class="notes-section">
@@ -162,8 +168,8 @@ const taskVersion = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--notes-border);
+  padding-bottom: 0;
+  border-bottom: none;
   margin-left: -12px;
   margin-right: -12px;
   margin-top: -10px;
@@ -226,27 +232,45 @@ const taskVersion = computed(() => {
   gap: 6px;
 }
 
-.notes-task-header-icon {
+.notes-task-secondary-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin-left: -12px;
+  margin-right: -12px;
+  margin-top: -4px;
+  padding-left: 12px;
+  padding-right: 12px;
+  background: var(--notes-panel-strong);
+  border-radius: 0 0 6px 6px;
+  border-top: 1px solid var(--notes-border);
+}
+
+.notes-task-secondary-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   background: transparent;
   border: none;
   color: var(--notes-muted);
-  padding: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 6px;
   cursor: pointer;
   border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: all 0.2s;
 }
 
-.notes-task-header-icon:hover {
+.notes-task-secondary-action:hover {
   background: var(--notes-hover);
   color: var(--notes-text);
 }
 
-.notes-task-header-icon svg {
+.notes-task-secondary-action svg {
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
 }
 
 .notes-task-assign {

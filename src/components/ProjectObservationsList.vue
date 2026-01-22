@@ -1,8 +1,16 @@
 <template>
   <div>
     <div class="notes-section-header">
-      <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Open observations') }} <span class="notes-count-badge">{{ assignedTasks.length }}</span></div>
+      <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Observations') }}</div>
       <div class="notes-filter-badges">
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'open' }"
+          type="button"
+          @click="filterMode = 'open'"
+        >
+          Open
+        </button>
         <button
           class="notes-filter-badge"
           :class="{ active: filterMode === 'date' }"
@@ -26,67 +34,26 @@
       <div v-if="sortedTasks.length === 0" class="notes-row notes-row-empty">
         Aucune tâche.
       </div>
-      <template v-if="filterMode === 'assignee' && groupedTasksByAssignee">
-        <div
-          v-for="group in groupedTasksByAssignee"
-          :key="group.assigneeId || UNASSIGNED_ID"
-          class="notes-assignee-group"
-        >
-          <div class="notes-assignee-header">
-            <span class="notes-assignee-header-name">{{ group.assigneeName }}</span>
-            <div v-if="group.assigneeCategories.length > 0" class="notes-assignee-header-badges">
-                <CategoryBadge
-                  v-for="category in group.assigneeCategories"
-                  :key="category.id"
-                  :category="category"
-                  variant="header"
-                />
-            </div>
-          </div>
-          <TaskCard
-            v-for="task in group.tasks"
-            :key="task.id"
-            :task="task"
-            :task-content-map="taskContentMap"
-            :intervenants="intervenants"
-            :categories="categories"
-            :visits="visits"
-            :show-category-badges="filterMode === 'date'"
-            :show-assignee-meta="false"
-            :show-unassigned-badge="false"
-            @task-click="$emit('task-click', $event)"
-            @task-menu-click="$emit('task-menu-click', $event)"
-            @image-click="$emit('image-click', $event)"
-            @add-text="$emit('add-text', $event)"
-            @add-photo="$emit('add-photo', $event)"
-            @edit-photo="$emit('edit-photo', $event)"
-            @manage-observations="$emit('manage-observations', $event)"
-            @assign-intervenant="$emit('assign-intervenant', $event)"
-          />
-        </div>
-      </template>
-      <template v-else>
-        <TaskCard
-          v-for="task in sortedTasks"
-          :key="task.id"
-          :task="task"
-          :task-content-map="taskContentMap"
-          :intervenants="intervenants"
-          :categories="categories"
-          :visits="visits"
-          :show-category-badges="filterMode === 'date'"
-          :show-assignee-meta="filterMode === 'assignee'"
-          :show-unassigned-badge="true"
-          @task-click="$emit('task-click', $event)"
-          @task-menu-click="$emit('task-menu-click', $event)"
-          @image-click="$emit('image-click', $event)"
-          @add-text="$emit('add-text', $event)"
-          @add-photo="$emit('add-photo', $event)"
-          @edit-photo="$emit('edit-photo', $event)"
-          @manage-observations="$emit('manage-observations', $event)"
-          @assign-intervenant="$emit('assign-intervenant', $event)"
-        />
-      </template>
+      <TaskCard
+        v-for="task in sortedTasks"
+        :key="task.id"
+        :task="task"
+        :task-content-map="taskContentMap"
+        :intervenants="intervenants"
+        :categories="categories"
+        :visits="visits"
+        :show-category-badges="filterMode === 'date'"
+        :show-assignee-meta="filterMode === 'open' || filterMode === 'assignee'"
+        :show-unassigned-badge="filterMode === 'open'"
+        @task-click="$emit('task-click', $event)"
+        @task-menu-click="$emit('task-menu-click', $event)"
+        @image-click="$emit('image-click', $event)"
+        @add-text="$emit('add-text', $event)"
+        @add-photo="$emit('add-photo', $event)"
+        @edit-photo="$emit('edit-photo', $event)"
+        @manage-observations="$emit('manage-observations', $event)"
+        @assign-intervenant="$emit('assign-intervenant', $event)"
+      />
     </div>
   </div>
 </template>
@@ -124,7 +91,7 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
 }>();
 
-const filterMode = ref<"assignee" | "date">("date");
+const filterMode = ref<"open" | "assignee" | "date">("open");
 
 // Constants
 const UNASSIGNED_LABEL = "Not assigned";
@@ -165,15 +132,16 @@ const unassignedTasksCount = computed(() => {
 const sortedTasks = computed(() => {
   let tasks = [...filteredTasks.value];
   
-  // In date filter mode, only show not assigned tasks
+  // Apply filtering based on filter mode
   if (filterMode.value === "date") {
+    // In date filter mode, only show not assigned tasks
     tasks = tasks.filter((task) => !task.intervenant_id);
-  }
-  
-  // In assignee filter mode, only show assigned tasks (exclude not assigned)
-  if (filterMode.value === "assignee") {
+  } else if (filterMode.value === "assignee") {
+    // In assignee filter mode, only show assigned tasks (exclude not assigned)
     tasks = tasks.filter((task) => task.intervenant_id != null);
   }
+  // In open filter mode, show all open tasks (both assigned and not assigned)
+  // No filtering needed - show everything
   
   if (filterMode.value === "assignee") {
     return tasks.sort((a, b) => {

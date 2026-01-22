@@ -117,6 +117,11 @@
       @close="closeImageModal"
     />
 
+    <!-- Toast notification -->
+    <div v-if="toastMessage" class="notes-toast">
+      {{ toastMessage }}
+    </div>
+
     <div
       v-if="isActionsSheetOpen"
       class="notes-sheet-backdrop"
@@ -468,8 +473,27 @@ const handleTaskActionAssignToIntervenant = async (intervenantId: string | null)
   closeTaskActionsSheet();
 };
 
+const toastMessage = ref<string | null>(null);
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const showToast = (message: string) => {
+  toastMessage.value = message;
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = null;
+    toastTimeout = null;
+  }, 3000);
+};
+
 const handleTaskActionToggleStatus = async () => {
   if (!taskActionsTask.value) return;
+  // Prevent marking unassigned tasks as done and show message
+  if (!taskActionsTask.value.intervenant_id && taskActionsTask.value.status === "open") {
+    showToast("Assign an intervenant before closing this observation");
+    return;
+  }
   await toggleTaskStatus(taskActionsTask.value);
   closeTaskActionsSheet();
 };
@@ -1168,6 +1192,9 @@ const updatePhoto = async (photoId: string, newBlob: Blob) => {
 
 onBeforeUnmount(() => {
   revokeTaskContentUrls();
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
 });
 
 const toggleTaskStatus = async (task: Task) => {
@@ -1462,6 +1489,35 @@ const deleteTask = async (task: Task) => {
 
 .notes-sheet-row-danger:hover {
   background: rgba(255, 107, 107, 0.1);
+}
+
+.notes-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 193, 7, 0.95);
+  color: #000;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-width: calc(100% - 40px);
+  animation: toastSlideIn 0.3s ease-out;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .notes-sheet-title {
