@@ -59,6 +59,7 @@
             @add-photo="$emit('add-photo', $event)"
             @edit-photo="$emit('edit-photo', $event)"
             @manage-observations="$emit('manage-observations', $event)"
+            @assign-intervenant="$emit('assign-intervenant', $event)"
           />
         </div>
       </template>
@@ -90,6 +91,7 @@
             @add-photo="$emit('add-photo', $event)"
             @edit-photo="$emit('edit-photo', $event)"
             @manage-observations="$emit('manage-observations', $event)"
+            @assign-intervenant="$emit('assign-intervenant', $event)"
           />
         </div>
       </template>
@@ -146,6 +148,7 @@ const emit = defineEmits<{
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
   "manage-observations": [task: Task];
+  "assign-intervenant": [task: Task];
 }>();
 
 const filterMode = ref<"assignee" | "date">("date");

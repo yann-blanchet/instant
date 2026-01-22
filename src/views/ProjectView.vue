@@ -60,6 +60,7 @@
       @add-photo="handleAddPhotoToTask"
       @edit-photo="handleEditPhoto"
       @manage-observations="handleManageObservations"
+      @assign-intervenant="handleAssignIntervenant"
     />
 
     <div class="notes-bottom-bar">
@@ -326,6 +327,15 @@
       @delete="handleDeleteObservation"
       @add="handleAddObservation"
     />
+
+    <IntervenantAssignSheet
+      v-model="isIntervenantAssignSheetOpen"
+      :intervenants="projectIntervenantsList"
+      :categories="categories"
+      :current-intervenant-id="assigningTaskId?.intervenant_id"
+      @close="closeIntervenantAssignSheet"
+      @assign="handleAssignIntervenantToTask"
+    />
   </section>
 </template>
 
@@ -337,6 +347,7 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
 import ImagePicker from "../components/ImagePicker.vue";
+import IntervenantAssignSheet from "../components/IntervenantAssignSheet.vue";
 import ObservationsSheet from "../components/ObservationsSheet.vue";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
@@ -369,6 +380,8 @@ const editingPhotoId = ref<string | null>(null);
 const isObservationsSheetOpen = ref(false);
 const managingTaskId = ref<string | null>(null);
 const editingObservationIndex = ref<number | null>(null);
+const isIntervenantAssignSheetOpen = ref(false);
+const assigningTaskId = ref<Task | null>(null);
 
 const managingTaskObservations = computed(() => {
   if (!managingTaskId.value) return [];
@@ -1061,6 +1074,25 @@ const handleAddObservation = () => {
   editingTaskId.value = managingTaskId.value;
   isObservationsSheetOpen.value = false;
   isTextSheetOpen.value = true;
+};
+
+const handleAssignIntervenant = (task: Task) => {
+  assigningTaskId.value = task;
+  isIntervenantAssignSheetOpen.value = true;
+};
+
+const closeIntervenantAssignSheet = () => {
+  isIntervenantAssignSheetOpen.value = false;
+  assigningTaskId.value = null;
+};
+
+const handleAssignIntervenantToTask = async (intervenantId: string | null) => {
+  if (!assigningTaskId.value) return;
+  await db.tasks.update(assigningTaskId.value.id, {
+    intervenant_id: intervenantId,
+    updated_at: nowIso(),
+  });
+  closeIntervenantAssignSheet();
 };
 
 const updatePhoto = async (photoId: string, newBlob: Blob) => {
