@@ -50,6 +50,7 @@
             :task-content-map="taskContentMap"
             :intervenants="intervenants"
             :categories="categories"
+            :visits="visits"
             :show-category-badges="filterMode === 'date'"
             :show-assignee-meta="false"
             :show-unassigned-badge="false"
@@ -72,6 +73,7 @@
           :task-content-map="taskContentMap"
           :intervenants="intervenants"
           :categories="categories"
+          :visits="visits"
           :show-category-badges="filterMode === 'date'"
           :show-assignee-meta="filterMode === 'assignee'"
           :show-unassigned-badge="true"
@@ -183,8 +185,8 @@ const sortedTasks = computed(() => {
       return aName.localeCompare(bName);
     });
   } else {
-    // By date (ascending)
-    return tasks.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    // By date (descending - newest first, oldest last)
+    return tasks.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 });
 

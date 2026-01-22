@@ -106,9 +106,6 @@
           >
             Delete
           </button>
-          <button class="notes-sheet-row" type="button" @click="closeTaskActionsSheet">
-            Cancel
-          </button>
         </div>
       </div>
     </div>

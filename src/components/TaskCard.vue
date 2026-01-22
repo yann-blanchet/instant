@@ -2,9 +2,36 @@
   <div class="notes-row notes-task-row">
     <div class="notes-task-header">
       <div class="notes-row-meta">
+        <span class="notes-task-version">{{ taskVersion }}</span>
         <span>{{ formatRelativeTime(task.updated_at) }}</span>
       </div>
       <div class="notes-task-header-actions">
+        <button
+          class="notes-task-header-icon"
+          type="button"
+          @click.stop="$emit('add-text', task)"
+          aria-label="Add text observation"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </button>
+        <button
+          class="notes-task-header-icon"
+          type="button"
+          @click.stop="$emit('add-photo', task)"
+          aria-label="Add photo"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </button>
         <button
           class="notes-task-assign"
           type="button"
@@ -25,26 +52,8 @@
     </div>
     <div class="notes-row-text">
       <div class="notes-section">
-        <div class="notes-section-header">
-          <div class="notes-section-label">Observations</div>
-          <button
-            class="notes-section-action"
-            type="button"
-            aria-label="Add observation"
-            @click.stop="$emit('add-text', task)"
-          >
-            +
-          </button>
-        </div>
         <div
-          v-if="!taskContentMap[task.id]?.observations?.length"
-          class="notes-row notes-row-empty notes-observations-clickable"
-          @click.stop="$emit('manage-observations', task)"
-        >
-          Aucune observation.
-        </div>
-        <div
-          v-else
+          v-if="taskContentMap[task.id]?.observations?.length"
           class="notes-observations notes-observations-clickable"
           @click.stop="$emit('manage-observations', task)"
         >
@@ -59,21 +68,7 @@
       </div>
 
       <div class="notes-section">
-        <div class="notes-section-header">
-          <div class="notes-section-label">Photos</div>
-          <button
-            class="notes-section-action"
-            type="button"
-            aria-label="Add photo"
-            @click.stop="$emit('add-photo', task)"
-          >
-            +
-          </button>
-        </div>
-        <div v-if="!taskContentMap[task.id]?.photos?.length" class="notes-row notes-row-empty">
-          Aucune photo.
-        </div>
-        <div v-else class="notes-photo-grid">
+        <div v-if="taskContentMap[task.id]?.photos?.length" class="notes-photo-grid">
           <img
             v-for="(url, index) in taskContentMap[task.id].photos"
             :key="`${task.id}-photo-${index}`"
@@ -89,8 +84,9 @@
 </template>
 
 <script setup lang="ts">
-import type { Category, Intervenant, Task } from "../db/types";
-import { formatRelativeTime } from "../utils/format";
+import { computed } from "vue";
+import type { Category, Intervenant, Task, Visit } from "../db/types";
+import { formatRelativeTime, formatVisitNumber } from "../utils/format";
 import CategoryBadge from "./CategoryBadge.vue";
 
 const props = withDefaults(
@@ -99,6 +95,7 @@ const props = withDefaults(
     taskContentMap: Record<string, { observations: string[]; photos: string[]; photoIds: string[] }>;
     intervenants: Intervenant[];
     categories: Category[];
+    visits: Visit[];
     showCategoryBadges?: boolean;
     showAssigneeMeta?: boolean;
     showUnassignedBadge?: boolean;
@@ -130,6 +127,14 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   if (!intervenant?.category_ids || intervenant.category_ids.length === 0) return [];
   return props.categories.filter((c) => intervenant.category_ids?.includes(c.id));
 };
+
+const taskVersion = computed(() => {
+  const visitId = props.task.opened_visit_id || props.task.visit_id;
+  if (!visitId) return "v1";
+  const visit = props.visits.find((v) => v.id === visitId);
+  if (!visit?.visit_number) return "v1";
+  return `v${formatVisitNumber(visit.visit_number)}`;
+});
 </script>
 
 <style scoped>
@@ -191,6 +196,13 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   color: var(--notes-muted);
 }
 
+.notes-task-version {
+  font-size: 11px;
+  color: var(--notes-text);
+  font-weight: 600;
+  opacity: 1;
+}
+
 
 .notes-assignee-meta {
   font-size: 11px;
@@ -211,7 +223,30 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
 .notes-task-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.notes-task-header-icon {
+  background: transparent;
+  border: none;
+  color: var(--notes-muted);
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.notes-task-header-icon:hover {
+  background: var(--notes-hover);
+  color: var(--notes-text);
+}
+
+.notes-task-header-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .notes-task-assign {
