@@ -43,84 +43,22 @@
                 />
             </div>
           </div>
-          <div
+          <TaskCard
             v-for="task in group.tasks"
             :key="task.id"
-            class="notes-row notes-task-row"
-            @click="$emit('task-click', task)"
-          >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="$emit('image-click', url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-right">
-              <button
-                class="notes-task-menu"
-                type="button"
-                @click.stop.prevent="$emit('task-menu-click', task)"
-                aria-label="Task actions"
-              >
-                ⋯
-              </button>
-              <div class="notes-task-right-content">
-                <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
-                  <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-                    <CategoryBadge
-                      v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-                      :key="category.id"
-                      :category="category"
-                      variant="task"
-                    />
-                  </template>
-                  <CategoryBadge
-                    v-else-if="!getTaskAssignee(task)"
-                    :label="UNASSIGNED_LABEL"
-                    variant="task"
-                  />
-                </div>
-                <div class="notes-row-meta">
-                  <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
-                    {{ getTaskAssignee(task)?.name }}
-                  </span>
-                  <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            :task="task"
+            :task-content-map="taskContentMap"
+            :intervenants="intervenants"
+            :categories="categories"
+            :show-category-badges="filterMode === 'date'"
+            :show-assignee-meta="filterMode !== 'assignee'"
+            @task-click="$emit('task-click', $event)"
+            @task-menu-click="$emit('task-menu-click', $event)"
+            @image-click="$emit('image-click', $event)"
+            @add-text="$emit('add-text', $event)"
+            @add-photo="$emit('add-photo', $event)"
+            @edit-photo="$emit('edit-photo', $event)"
+          />
         </div>
       </template>
       <template v-else-if="filterMode === 'date' && groupedTasksByVisit">
@@ -135,168 +73,40 @@
               <span v-if="group.visitDate" class="notes-visit-header-date"> · {{ formatDate(group.visitDate) }}</span>
             </span>
           </div>
-          <div
+          <TaskCard
             v-for="task in group.tasks"
             :key="task.id"
-            class="notes-row notes-task-row"
-            @click="$emit('task-click', task)"
-          >
-            <div class="notes-row-text">
-              <div
-                v-if="taskContentMap[task.id]?.observations?.length"
-                class="notes-observations"
-              >
-                <div
-                  v-for="(text, index) in taskContentMap[task.id].observations"
-                  :key="`${task.id}-obs-${index}`"
-                  class="notes-row-subtitle"
-                >
-                  {{ text }}
-                </div>
-              </div>
-
-              <div
-                v-if="taskContentMap[task.id]?.photos?.length"
-                class="notes-photo-grid"
-              >
-                <img
-                  v-for="(url, index) in taskContentMap[task.id].photos"
-                  :key="`${task.id}-photo-${index}`"
-                  class="notes-content-image"
-                  :src="url"
-                  alt="Task photo"
-                  @click.stop="$emit('image-click', url)"
-                />
-              </div>
-
-              <div
-                v-if="
-                  !taskContentMap[task.id]?.observations?.length &&
-                  !taskContentMap[task.id]?.photos?.length
-                "
-                class="notes-row-subtitle"
-              >
-                Aucun contenu.
-              </div>
-            </div>
-            <div class="notes-task-right">
-              <button
-                class="notes-task-menu"
-                type="button"
-                @click.stop.prevent="$emit('task-menu-click', task)"
-                aria-label="Task actions"
-              >
-                ⋯
-              </button>
-              <div class="notes-task-right-content">
-                <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
-                  <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-                    <CategoryBadge
-                      v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-                      :key="category.id"
-                      :category="category"
-                      variant="task"
-                    />
-                  </template>
-                  <CategoryBadge
-                    v-else-if="!getTaskAssignee(task)"
-                    :label="UNASSIGNED_LABEL"
-                    variant="task"
-                  />
-                </div>
-                <div class="notes-row-meta">
-                  <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
-                    {{ getTaskAssignee(task)?.name }}
-                  </span>
-                  <span>{{ formatRelativeTime(task.updated_at) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            :task="task"
+            :task-content-map="taskContentMap"
+            :intervenants="intervenants"
+            :categories="categories"
+            :show-category-badges="filterMode === 'date'"
+            :show-assignee-meta="filterMode !== 'assignee'"
+            @task-click="$emit('task-click', $event)"
+            @task-menu-click="$emit('task-menu-click', $event)"
+            @image-click="$emit('image-click', $event)"
+            @add-text="$emit('add-text', $event)"
+            @add-photo="$emit('add-photo', $event)"
+            @edit-photo="$emit('edit-photo', $event)"
+          />
         </div>
       </template>
       <template v-else>
-        <div
+        <TaskCard
           v-for="task in sortedTasks"
           :key="task.id"
-          class="notes-row notes-task-row"
-          @click="$emit('task-click', task)"
-        >
-          <div class="notes-row-text">
-            <div
-              v-if="taskContentMap[task.id]?.observations?.length"
-              class="notes-observations"
-            >
-              <div
-                v-for="(text, index) in taskContentMap[task.id].observations"
-                :key="`${task.id}-obs-${index}`"
-                class="notes-row-subtitle"
-              >
-                {{ text }}
-              </div>
-            </div>
-
-            <div
-              v-if="taskContentMap[task.id]?.photos?.length"
-              class="notes-photo-grid"
-            >
-              <img
-                v-for="(url, index) in taskContentMap[task.id].photos"
-                :key="`${task.id}-photo-${index}`"
-                class="notes-content-image"
-                :src="url"
-                alt="Task photo"
-                @click.stop="$emit('image-click', url)"
-              />
-            </div>
-
-            <div
-              v-if="
-                !taskContentMap[task.id]?.observations?.length &&
-                !taskContentMap[task.id]?.photos?.length
-              "
-              class="notes-row-subtitle"
-            >
-              Aucun contenu.
-            </div>
-          </div>
-          <div class="notes-task-right">
-            <button
-              class="notes-task-menu"
-              type="button"
-              @click.stop.prevent="$emit('task-menu-click', task)"
-              aria-label="Task actions"
-            >
-              ⋯
-            </button>
-            <div class="notes-task-right-content">
-              <div v-if="filterMode === 'date' && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))" class="notes-task-category-badges">
-                <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-                  <span
-                    v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-                    :key="category.id"
-                    class="notes-task-category-badge"
-                    :style="category.color ? { borderColor: category.color } : {}"
-                  >
-                    {{ category.name }}
-                  </span>
-                </template>
-                <span
-                  v-else-if="!getTaskAssignee(task)"
-                  class="notes-task-category-badge"
-                >
-                  {{ UNASSIGNED_LABEL }}
-                </span>
-              </div>
-              <div class="notes-row-meta">
-                <span v-if="filterMode !== 'assignee' && getTaskAssignee(task)" class="notes-assignee-meta">
-                  {{ getTaskAssignee(task)?.name }}
-                </span>
-                <span>{{ formatRelativeTime(task.updated_at) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          :task="task"
+          :task-content-map="taskContentMap"
+          :intervenants="intervenants"
+          :categories="categories"
+          :show-category-badges="filterMode === 'date'"
+          :show-assignee-meta="filterMode !== 'assignee'"
+          @task-click="$emit('task-click', $event)"
+          @task-menu-click="$emit('task-menu-click', $event)"
+          @image-click="$emit('image-click', $event)"
+          @add-text="$emit('add-text', $event)"
+          @add-photo="$emit('add-photo', $event)"
+        />
       </template>
     </div>
   </div>
@@ -309,6 +119,7 @@ import { db } from "../db";
 import type { Category, Intervenant, Task, TaskPhoto, Visit } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
 import CategoryBadge from "./CategoryBadge.vue";
+import TaskCard from "./TaskCard.vue";
 
 const props = defineProps<{
   projectId: string;
@@ -317,7 +128,7 @@ const props = defineProps<{
   visits: Visit[];
   intervenants: Intervenant[];
   categories: Category[];
-  taskContentMap: Record<string, { observations: string[]; photos: string[] }>;
+  taskContentMap: Record<string, { observations: string[]; photos: string[]; photoIds: string[] }>;
   status?: "open" | "done";
   title?: string;
   inSheet?: boolean;
@@ -327,6 +138,9 @@ const emit = defineEmits<{
   "task-click": [task: Task];
   "task-menu-click": [task: Task];
   "image-click": [url: string];
+  "add-text": [task: Task];
+  "add-photo": [task: Task];
+  "edit-photo": [payload: { task: Task; photoIndex: number }];
 }>();
 
 const filterMode = ref<"assignee" | "date">("date");

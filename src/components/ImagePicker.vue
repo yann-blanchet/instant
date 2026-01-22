@@ -46,14 +46,16 @@ const handleFileSelected = (event: Event) => {
   input.value = "";
 };
 
-const closePhotoEditor = () => {
+const closePhotoEditor = (emitCancel = true) => {
   // Revoke blob URL if it exists
   if (photoEditorSource.value.value.startsWith("blob:")) {
     URL.revokeObjectURL(photoEditorSource.value.value);
   }
   photoEditorSource.value.value = "";
   isPhotoEditorOpen.value = false;
-  emit("cancel");
+  if (emitCancel) {
+    emit("cancel");
+  }
 };
 
 const handlePhotoEdited = async (dataUrl: string) => {
@@ -61,8 +63,8 @@ const handlePhotoEdited = async (dataUrl: string) => {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   
-  // Close editor and clean up
-  closePhotoEditor();
+  // Close editor and clean up (don't emit cancel since we're sending the image)
+  closePhotoEditor(false);
   
   // Emit the blob to parent
   emit("image-selected", blob);

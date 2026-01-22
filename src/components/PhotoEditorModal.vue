@@ -109,6 +109,9 @@
       </div>
 
       <div class="photo-editor-bottom-bar">
+        <button class="photo-editor-bottom-delete" type="button" @click="emitDelete">
+          Delete
+        </button>
         <button class="photo-editor-bottom-cancel" type="button" @click="emitClose">
           Cancel
         </button>
@@ -141,6 +144,7 @@ const emit = defineEmits<{
   (event: "close"): void;
   (event: "update-image", payload: string): void;
   (event: "send-image", payload: string): void;
+  (event: "delete"): void;
 }>();
 
 const stageRef = ref<InstanceType<typeof Stage> | null>(null);
@@ -196,6 +200,7 @@ const groupConfig = computed(() => ({
 }));
 
 const emitClose = () => emit("close");
+const emitDelete = () => emit("delete");
 
 const loadImage = (src: string) => {
   if (!src) return;
@@ -643,6 +648,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
 }
 
+.photo-editor-bottom-delete,
 .photo-editor-bottom-cancel,
 .photo-editor-bottom-save {
   flex: 1;
@@ -650,6 +656,12 @@ onBeforeUnmount(() => {
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.photo-editor-bottom-delete {
+  border: 1px solid #ff3b30;
+  background: transparent;
+  color: #ff3b30;
 }
 
 .photo-editor-bottom-cancel {

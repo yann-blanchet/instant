@@ -56,6 +56,9 @@
       @task-click="openTask"
       @task-menu-click="openTaskActionsSheet"
       @image-click="openImageModal"
+      @add-text="handleAddTextToTask"
+      @add-photo="handleAddPhotoToTask"
+      @edit-photo="handleEditPhoto"
     />
 
     <div class="notes-bottom-bar">
@@ -286,6 +289,8 @@
           @task-click="openTask"
           @task-menu-click="openTaskActionsSheet"
           @image-click="openImageModal"
+          @add-text="handleAddTextToTask"
+          @add-photo="handleAddPhotoToTask"
         />
         <div class="notes-sheet-actions">
           <button class="notes-button" type="button" @click="closeDoneObservations">
@@ -300,6 +305,16 @@
       @send="handleTextSend"
       @close="closeTextSheet"
     />
+
+    <PhotoEditorModal
+      :is-active="isPhotoEditorOpen"
+      :image-field="{ value: photoEditorSource }"
+      :show-save="true"
+      @close="closePhotoEditor"
+      @update-image="handlePhotoUpdated"
+      @send-image="handlePhotoEdited"
+      @delete="handleDeletePhoto"
+    />
   </section>
 </template>
 
@@ -311,6 +326,7 @@ import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
 import ImagePicker from "../components/ImagePicker.vue";
+import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import ProjectObservationsList from "../components/ProjectObservationsList.vue";
 import TextSheet from "../components/TextSheet.vue";
@@ -334,6 +350,10 @@ const selectedImageUrl = ref<string | null>(null);
 const projectIntervenantIds = ref<string[]>([]);
 const isTextSheetOpen = ref(false);
 const imagePickerRef = ref<InstanceType<typeof ImagePicker> | null>(null);
+const editingTaskId = ref<string | null>(null);
+const isPhotoEditorOpen = ref(false);
+const photoEditorSource = ref("");
+const editingPhotoId = ref<string | null>(null);
 
 
 const project = useLiveQuery(
@@ -481,7 +501,7 @@ const doneTasks = computed(() => taskGroups.value.done);
 
 
 const taskContentMap = ref<
-  Record<string, { observations: string[]; photos: string[] }>
+  Record<string, { observations: string[]; photos: string[]; photoIds: string[] }>
 >({});
 
 const revokeTaskContentUrls = () => {
@@ -498,7 +518,7 @@ watch(
   [taskPhotos, tasks],
   ([photos, taskList]) => {
     revokeTaskContentUrls();
-    const map: Record<string, { observations: string[]; photos: string[] }> = {};
+    const map: Record<string, { observations: string[]; photos: string[]; photoIds: string[] }> = {};
     const photosByTask = new Map<string, TaskPhoto[]>();
     photos.forEach((photo) => {
       const group = photosByTask.get(photo.task_id) ?? [];
@@ -507,24 +527,29 @@ watch(
     });
 
     taskList.forEach((task) => {
-      const entry = map[task.id] ?? { observations: [], photos: [] };
+      if (!map[task.id]) {
+        map[task.id] = { observations: [], photos: [], photoIds: [] };
+      }
+      const entry = map[task.id];
       entry.observations = [...(task.observations ?? [])];
 
       const taskPhotosList = photosByTask.get(task.id) ?? [];
       const photosById = new Map(taskPhotosList.map((photo) => [photo.id, photo]));
       const orderedPhotoIds = task.photo_ids ?? [];
       const photoUrls: string[] = [];
+      const photoIdArray: string[] = [];
       orderedPhotoIds.forEach((photoId) => {
         const photo = photosById.get(photoId);
         if (photo?.image_blob) {
           photoUrls.push(URL.createObjectURL(photo.image_blob));
+          photoIdArray.push(photoId);
         } else if (photo?.url) {
           photoUrls.push(photo.url);
+          photoIdArray.push(photoId);
         }
       });
       entry.photos = photoUrls;
-
-      map[task.id] = entry;
+      entry.photoIds = photoIdArray;
     });
     taskContentMap.value = map;
   },
@@ -658,72 +683,118 @@ const openTask = (task: Task) => {
 };
 
 const openAddTaskWithText = () => {
+  editingTaskId.value = null; // Clear any existing task ID to create new task
   isTextSheetOpen.value = true;
 };
 
 const openAddTaskWithImage = () => {
+  editingTaskId.value = null; // Clear any existing task ID to create new task
   imagePickerRef.value?.open();
 };
 
 const handleImageSelected = async (blob: Blob) => {
-  const visitId = await ensureOngoingVisit();
   const timestamp = nowIso();
-  const taskId = makeId();
   const photoId = makeId();
   
-  // Create task with the photo
-  await db.tasks.add({
-    id: taskId,
-    project_id: props.id,
-    visit_id: visitId,
-    opened_visit_id: visitId,
-    done_visit_id: null,
-    status: "open",
-    intervenant_id: null, // Unassigned by default
-    audio_url: null,
-    photo_ids: [photoId],
-    observations: [],
-    created_at: timestamp,
-    updated_at: timestamp,
-    deleted_at: null,
-  });
-  
-  // Store photo with original blob (compression will happen in background during sync)
-  await db.task_photos.add({
-    id: photoId,
-    task_id: taskId,
-    url: null,
-    storage_path: null,
-    image_blob: blob,
-    created_at: timestamp,
-    updated_at: timestamp,
-    deleted_at: null,
-  });
-  
-  // Compress in background (non-blocking)
-  const { compressImage } = await import("../utils/imageCompression");
-  compressImage(blob, {
-    maxSizeMB: 0.5,
-    maxWidthOrHeight: 1920,
-    initialQuality: 0.80,
-  }).then((compressedBlob) => {
-    db.task_photos.update(photoId, {
-      image_blob: compressedBlob,
-      updated_at: nowIso(),
-    }).catch((error) => {
-      console.error('[ProjectView] Failed to update compressed image:', error);
+  if (editingTaskId.value) {
+    // Adding photo to existing task
+    const task = await db.tasks.get(editingTaskId.value);
+    if (task) {
+      const nextPhotoIds = [...(task.photo_ids ?? []), photoId];
+      await db.tasks.update(editingTaskId.value, {
+        photo_ids: nextPhotoIds,
+        updated_at: timestamp,
+      });
+      
+      // Store photo with original blob (compression will happen in background during sync)
+      await db.task_photos.add({
+        id: photoId,
+        task_id: editingTaskId.value,
+        url: null,
+        storage_path: null,
+        image_blob: blob,
+        created_at: timestamp,
+        updated_at: timestamp,
+        deleted_at: null,
+      });
+      
+      // Compress in background (non-blocking)
+      const { compressImage } = await import("../utils/imageCompression");
+      compressImage(blob, {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 1920,
+        initialQuality: 0.80,
+      }).then((compressedBlob) => {
+        db.task_photos.update(photoId, {
+          image_blob: compressedBlob,
+          updated_at: nowIso(),
+        }).catch((error) => {
+          console.error('[ProjectView] Failed to update compressed image:', error);
+        });
+      }).catch((error) => {
+        console.error('[ProjectView] Background compression failed:', error);
+      });
+    }
+    editingTaskId.value = null;
+  } else {
+    // Create new task with the photo
+    const visitId = await ensureOngoingVisit();
+    const taskId = makeId();
+    
+    await db.tasks.add({
+      id: taskId,
+      project_id: props.id,
+      visit_id: visitId,
+      opened_visit_id: visitId,
+      done_visit_id: null,
+      status: "open",
+      intervenant_id: null, // Unassigned by default
+      audio_url: null,
+      photo_ids: [photoId],
+      observations: [],
+      created_at: timestamp,
+      updated_at: timestamp,
+      deleted_at: null,
     });
-  }).catch((error) => {
-    console.error('[ProjectView] Background compression failed:', error);
-  });
-};
-
-const handleImageCancel = () => {
-  // User cancelled image selection - nothing to do
+    
+    // Store photo with original blob (compression will happen in background during sync)
+    await db.task_photos.add({
+      id: photoId,
+      task_id: taskId,
+      url: null,
+      storage_path: null,
+      image_blob: blob,
+      created_at: timestamp,
+      updated_at: timestamp,
+      deleted_at: null,
+    });
+    
+    // Compress in background (non-blocking)
+    const { compressImage } = await import("../utils/imageCompression");
+    compressImage(blob, {
+      maxSizeMB: 0.5,
+      maxWidthOrHeight: 1920,
+      initialQuality: 0.80,
+    }).then((compressedBlob) => {
+      db.task_photos.update(photoId, {
+        image_blob: compressedBlob,
+        updated_at: nowIso(),
+      }).catch((error) => {
+        console.error('[ProjectView] Failed to update compressed image:', error);
+      });
+    }).catch((error) => {
+      console.error('[ProjectView] Background compression failed:', error);
+    });
+  }
 };
 
 const closeTextSheet = () => {
   isTextSheetOpen.value = false;
+  editingTaskId.value = null;
+};
+
+const handleImageCancel = () => {
+  editingTaskId.value = null;
 };
 
 const ensureOngoingVisit = async () => {
@@ -751,25 +822,211 @@ const ensureOngoingVisit = async () => {
 };
 
 const handleTextSend = async (text: string) => {
-  const visitId = await ensureOngoingVisit();
-  const timestamp = nowIso();
-  const taskId = makeId();
+  if (editingTaskId.value) {
+    // Adding text to existing task
+    const task = await db.tasks.get(editingTaskId.value);
+    if (task) {
+      const nextObservations = [...(task.observations ?? []), text];
+      await db.tasks.update(editingTaskId.value, {
+        observations: nextObservations,
+        updated_at: nowIso(),
+      });
+    }
+    editingTaskId.value = null;
+  } else {
+    // Create new task with the observation
+    const visitId = await ensureOngoingVisit();
+    const timestamp = nowIso();
+    const taskId = makeId();
+    
+    await db.tasks.add({
+      id: taskId,
+      project_id: props.id,
+      visit_id: visitId,
+      opened_visit_id: visitId,
+      done_visit_id: null,
+      status: "open",
+      intervenant_id: null, // Unassigned by default
+      audio_url: null,
+      photo_ids: [],
+      observations: [text],
+      created_at: timestamp,
+      updated_at: timestamp,
+      deleted_at: null,
+    });
+  }
+};
+
+const handleAddTextToTask = (task: Task) => {
+  editingTaskId.value = task.id;
+  isTextSheetOpen.value = true;
+};
+
+const handleAddPhotoToTask = async (task: Task) => {
+  editingTaskId.value = task.id;
+  imagePickerRef.value?.open();
+};
+
+const handleEditPhoto = async (payload: { task: Task; photoIndex: number }) => {
+  const { task, photoIndex } = payload;
+  const taskContent = taskContentMap.value[task.id];
+  if (!taskContent || !taskContent.photoIds || photoIndex >= taskContent.photoIds.length) return;
   
-  // Create task with the observation
-  await db.tasks.add({
-    id: taskId,
-    project_id: props.id,
-    visit_id: visitId,
-    opened_visit_id: visitId,
-    done_visit_id: null,
-    status: "open",
-    intervenant_id: null, // Unassigned by default
-    audio_url: null,
-    photo_ids: [],
-    observations: [text],
-    created_at: timestamp,
+  const photoId = taskContent.photoIds[photoIndex];
+  const photo = await db.task_photos.get(photoId);
+  if (!photo) return;
+  
+  editingPhotoId.value = photoId;
+  editingTaskId.value = task.id;
+  
+  // Load the photo into the editor
+  if (photo.image_blob) {
+    // Use local blob
+    const url = URL.createObjectURL(photo.image_blob);
+    photoEditorSource.value = url;
+    isPhotoEditorOpen.value = true;
+  } else if (photo.url) {
+    // Use URL from Supabase Storage
+    photoEditorSource.value = photo.url;
+    isPhotoEditorOpen.value = true;
+  }
+};
+
+const closePhotoEditor = () => {
+  if (photoEditorSource.value.startsWith("blob:")) {
+    URL.revokeObjectURL(photoEditorSource.value);
+  }
+  photoEditorSource.value = "";
+  isPhotoEditorOpen.value = false;
+  editingPhotoId.value = null;
+  editingTaskId.value = null;
+};
+
+const handlePhotoUpdated = async (dataUrl: string) => {
+  // This is called when user updates image in PhotoEditorModal
+  // The actual save happens in handlePhotoEdited when user clicks "Save"
+};
+
+const handlePhotoEdited = async (dataUrl: string) => {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  
+  if (editingPhotoId.value && editingTaskId.value) {
+    // Update existing photo
+    await updatePhoto(editingPhotoId.value, blob);
+  }
+  
+  closePhotoEditor();
+};
+
+const handleDeletePhoto = async () => {
+  if (!editingPhotoId.value || !editingTaskId.value) {
+    closePhotoEditor();
+    return;
+  }
+  
+  const timestamp = nowIso();
+  
+  // Soft delete the photo
+  await db.task_photos.update(editingPhotoId.value, {
+    deleted_at: timestamp,
     updated_at: timestamp,
-    deleted_at: null,
+  });
+  
+  // Remove photo_id from task's photo_ids array
+  const task = await db.tasks.get(editingTaskId.value);
+  if (task) {
+    const currentPhotoIds = task.photo_ids ?? [];
+    const updatedPhotoIds = currentPhotoIds.filter((id) => id !== editingPhotoId.value);
+    await db.tasks.update(editingTaskId.value, {
+      photo_ids: updatedPhotoIds,
+      updated_at: timestamp,
+    });
+  }
+  
+  // If photo is already synced to Supabase Storage, delete it from storage
+  const photo = await db.task_photos.get(editingPhotoId.value);
+  if (photo?.storage_path) {
+    try {
+      const { supabase } = await import("../supabase");
+      if (supabase) {
+        const { error } = await supabase.storage
+          .from('task-photos')
+          .remove([photo.storage_path]);
+        
+        if (error) {
+          console.error(`[ProjectView] Failed to delete photo from Storage:`, error);
+        } else {
+          console.log(`[ProjectView] ✓ Deleted photo from Storage: ${photo.storage_path}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[ProjectView] Error deleting photo from Storage:`, error);
+    }
+  }
+  
+  closePhotoEditor();
+};
+
+const updatePhoto = async (photoId: string, newBlob: Blob) => {
+  const timestamp = nowIso();
+  
+  // Get the photo to check if it was already synced
+  const photo = await db.task_photos.get(photoId);
+  const wasSynced = !!(photo?.storage_path && photo?.url);
+  
+  // Update immediately with original blob (fast, no compression delay)
+  await db.task_photos.update(photoId, {
+    image_blob: newBlob, // Store original first - will be compressed in background
+    url: null, // Clear URL since we have a new version
+    storage_path: null, // Clear storage path since we need to re-upload
+    updated_at: timestamp,
+  });
+  
+  // If it was synced, delete the old file from Storage
+  if (wasSynced && photo?.storage_path) {
+    try {
+      const { supabase } = await import("../supabase");
+      if (supabase) {
+        const { error } = await supabase.storage
+          .from('task-photos')
+          .remove([photo.storage_path]);
+        
+        if (error) {
+          console.error(`[ProjectView] Failed to delete old photo from Storage:`, error);
+        } else {
+          console.log(`[ProjectView] ✓ Deleted old photo from Storage: ${photo.storage_path}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[ProjectView] Error deleting old photo from Storage:`, error);
+    }
+  }
+  
+  // Update task timestamp
+  if (editingTaskId.value) {
+    await db.tasks.update(editingTaskId.value, {
+      updated_at: timestamp,
+    });
+  }
+  
+  // Compress in background (non-blocking) - update when done
+  const { compressImage } = await import("../utils/imageCompression");
+  compressImage(newBlob, {
+    maxSizeMB: 0.5,
+    maxWidthOrHeight: 1920,
+    initialQuality: 0.80,
+  }).then((compressedBlob) => {
+    // Update with compressed version when ready
+    db.task_photos.update(photoId, {
+      image_blob: compressedBlob,
+      updated_at: nowIso(),
+    }).catch((error) => {
+      console.error('[ProjectView] Failed to update compressed image:', error);
+    });
+  }).catch((error) => {
+    console.error('[ProjectView] Background compression failed:', error);
+    // Keep original if compression fails
   });
 };
 
