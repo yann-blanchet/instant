@@ -58,6 +58,7 @@
             @add-text="$emit('add-text', $event)"
             @add-photo="$emit('add-photo', $event)"
             @edit-photo="$emit('edit-photo', $event)"
+            @manage-observations="$emit('manage-observations', $event)"
           />
         </div>
       </template>
@@ -88,6 +89,7 @@
             @add-text="$emit('add-text', $event)"
             @add-photo="$emit('add-photo', $event)"
             @edit-photo="$emit('edit-photo', $event)"
+            @manage-observations="$emit('manage-observations', $event)"
           />
         </div>
       </template>
@@ -106,6 +108,8 @@
           @image-click="$emit('image-click', $event)"
           @add-text="$emit('add-text', $event)"
           @add-photo="$emit('add-photo', $event)"
+          @edit-photo="$emit('edit-photo', $event)"
+          @manage-observations="$emit('manage-observations', $event)"
         />
       </template>
     </div>
@@ -141,6 +145,7 @@ const emit = defineEmits<{
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
+  "manage-observations": [task: Task];
 }>();
 
 const filterMode = ref<"assignee" | "date">("date");

@@ -59,6 +59,7 @@
       @add-text="handleAddTextToTask"
       @add-photo="handleAddPhotoToTask"
       @edit-photo="handleEditPhoto"
+      @manage-observations="handleManageObservations"
     />
 
     <div class="notes-bottom-bar">
@@ -302,6 +303,7 @@
 
     <TextSheet
       v-model="isTextSheetOpen"
+      :initial-text="editingObservationText"
       @send="handleTextSend"
       @close="closeTextSheet"
     />
@@ -315,17 +317,27 @@
       @send-image="handlePhotoEdited"
       @delete="handleDeletePhoto"
     />
+
+    <ObservationsSheet
+      v-model="isObservationsSheetOpen"
+      :observations="managingTaskObservations"
+      @close="closeObservationsSheet"
+      @edit="handleEditObservation"
+      @delete="handleDeleteObservation"
+      @add="handleAddObservation"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useLiveQuery } from "../composables/useLiveQuery";
 import { db } from "../db";
 import { getNextVisitNumber } from "../db/visits";
 import ImageModal from "../components/ImageModal.vue";
 import ImagePicker from "../components/ImagePicker.vue";
+import ObservationsSheet from "../components/ObservationsSheet.vue";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import ProjectObservationsList from "../components/ProjectObservationsList.vue";
@@ -354,6 +366,21 @@ const editingTaskId = ref<string | null>(null);
 const isPhotoEditorOpen = ref(false);
 const photoEditorSource = ref("");
 const editingPhotoId = ref<string | null>(null);
+const isObservationsSheetOpen = ref(false);
+const managingTaskId = ref<string | null>(null);
+const editingObservationIndex = ref<number | null>(null);
+
+const managingTaskObservations = computed(() => {
+  if (!managingTaskId.value) return [];
+  const task = tasks.value?.find((t) => t.id === managingTaskId.value);
+  return task?.observations ?? [];
+});
+
+const editingObservationText = computed(() => {
+  if (editingObservationIndex.value === null || !managingTaskId.value) return "";
+  const task = tasks.value?.find((t) => t.id === managingTaskId.value);
+  return task?.observations?.[editingObservationIndex.value] ?? "";
+});
 
 
 const project = useLiveQuery(
@@ -791,6 +818,7 @@ const handleImageSelected = async (blob: Blob) => {
 const closeTextSheet = () => {
   isTextSheetOpen.value = false;
   editingTaskId.value = null;
+  editingObservationIndex.value = null;
 };
 
 const handleImageCancel = () => {
@@ -823,14 +851,27 @@ const ensureOngoingVisit = async () => {
 
 const handleTextSend = async (text: string) => {
   if (editingTaskId.value) {
-    // Adding text to existing task
     const task = await db.tasks.get(editingTaskId.value);
     if (task) {
-      const nextObservations = [...(task.observations ?? []), text];
-      await db.tasks.update(editingTaskId.value, {
-        observations: nextObservations,
-        updated_at: nowIso(),
-      });
+      if (editingObservationIndex.value !== null) {
+        // Editing existing observation
+        const currentObservations = [...(task.observations ?? [])];
+        if (editingObservationIndex.value >= 0 && editingObservationIndex.value < currentObservations.length) {
+          currentObservations[editingObservationIndex.value] = text;
+          await db.tasks.update(editingTaskId.value, {
+            observations: currentObservations,
+            updated_at: nowIso(),
+          });
+        }
+        editingObservationIndex.value = null;
+      } else {
+        // Adding text to existing task
+        const nextObservations = [...(task.observations ?? []), text];
+        await db.tasks.update(editingTaskId.value, {
+          observations: nextObservations,
+          updated_at: nowIso(),
+        });
+      }
     }
     editingTaskId.value = null;
   } else {
@@ -966,6 +1007,60 @@ const handleDeletePhoto = async () => {
   }
   
   closePhotoEditor();
+};
+
+const handleManageObservations = (task: Task) => {
+  managingTaskId.value = task.id;
+  editingObservationIndex.value = null;
+  isObservationsSheetOpen.value = true;
+};
+
+const closeObservationsSheet = () => {
+  isObservationsSheetOpen.value = false;
+  managingTaskId.value = null;
+  editingObservationIndex.value = null;
+};
+
+const handleEditObservation = (index: number) => {
+  if (!managingTaskId.value) return;
+  const task = tasks.value?.find((t) => t.id === managingTaskId.value);
+  if (!task) return;
+  
+  const observation = task.observations?.[index];
+  if (observation === undefined) return;
+  
+  editingObservationIndex.value = index;
+  editingTaskId.value = managingTaskId.value;
+  isObservationsSheetOpen.value = false;
+  isTextSheetOpen.value = true;
+  // Set initial text in TextSheet
+  nextTick(() => {
+    // TextSheet will handle the initialText prop
+  });
+};
+
+const handleDeleteObservation = async (index: number) => {
+  if (!managingTaskId.value) return;
+  
+  const task = await db.tasks.get(managingTaskId.value);
+  if (!task) return;
+  
+  const currentObservations = task.observations ?? [];
+  if (index < 0 || index >= currentObservations.length) return;
+  
+  const updatedObservations = currentObservations.filter((_, i) => i !== index);
+  await db.tasks.update(managingTaskId.value, {
+    observations: updatedObservations,
+    updated_at: nowIso(),
+  });
+};
+
+const handleAddObservation = () => {
+  if (!managingTaskId.value) return;
+  editingObservationIndex.value = null;
+  editingTaskId.value = managingTaskId.value;
+  isObservationsSheetOpen.value = false;
+  isTextSheetOpen.value = true;
 };
 
 const updatePhoto = async (photoId: string, newBlob: Blob) => {

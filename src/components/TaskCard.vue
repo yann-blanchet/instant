@@ -13,10 +13,18 @@
             +
           </button>
         </div>
-        <div v-if="!taskContentMap[task.id]?.observations?.length" class="notes-row notes-row-empty">
+        <div
+          v-if="!taskContentMap[task.id]?.observations?.length"
+          class="notes-row notes-row-empty notes-observations-clickable"
+          @click.stop="$emit('manage-observations', task)"
+        >
           Aucune observation.
         </div>
-        <div v-else class="notes-observations">
+        <div
+          v-else
+          class="notes-observations notes-observations-clickable"
+          @click.stop="$emit('manage-observations', task)"
+        >
           <div
             v-for="(text, index) in taskContentMap[task.id].observations"
             :key="`${task.id}-obs-${index}`"
@@ -112,6 +120,7 @@ const emit = defineEmits<{
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
+  "manage-observations": [task: Task];
 }>();
 
 const UNASSIGNED_LABEL = "Générale";
@@ -228,6 +237,18 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   flex-direction: column;
   gap: 4px;
   margin-top: 2px;
+}
+
+.notes-observations-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.notes-observations-clickable:hover {
+  background: var(--notes-hover);
 }
 
 .notes-photo-grid {
