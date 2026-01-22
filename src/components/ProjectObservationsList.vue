@@ -13,6 +13,14 @@
         </button>
         <button
           class="notes-filter-badge"
+          :class="{ active: filterMode === 'me' }"
+          type="button"
+          @click="filterMode = 'me'"
+        >
+          Assign to me
+        </button>
+        <button
+          class="notes-filter-badge"
           :class="{ active: filterMode === 'date' }"
           type="button"
           @click="filterMode = 'date'"
@@ -35,7 +43,7 @@
         :categories="categories"
         :visits="visits"
         :show-category-badges="filterMode === 'date'"
-        :show-assignee-meta="filterMode === 'open'"
+        :show-assignee-meta="filterMode === 'open' || filterMode === 'me'"
         :show-unassigned-badge="filterMode === 'open'"
         @task-click="$emit('task-click', $event)"
         @task-menu-click="$emit('task-menu-click', $event)"
@@ -83,7 +91,7 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
 }>();
 
-const filterMode = ref<"open" | "date">("open");
+const filterMode = ref<"open" | "me" | "date">("open");
 
 // Constants
 const UNASSIGNED_LABEL = "Not assigned";
@@ -121,6 +129,10 @@ const unassignedTasksCount = computed(() => {
   return filteredTasks.value.filter((task) => !task.intervenant_id).length;
 });
 
+const meIntervenant = computed(() => {
+  return props.intervenants.find((i) => i.name.toLowerCase() === "me");
+});
+
 const sortedTasks = computed(() => {
   let tasks = [...filteredTasks.value];
   
@@ -128,6 +140,14 @@ const sortedTasks = computed(() => {
   if (filterMode.value === "date") {
     // In date filter mode, only show not assigned tasks
     tasks = tasks.filter((task) => !task.intervenant_id);
+  } else if (filterMode.value === "me") {
+    // In me filter mode, only show tasks assigned to "Me" intervenant
+    if (meIntervenant.value) {
+      tasks = tasks.filter((task) => task.intervenant_id === meIntervenant.value?.id);
+    } else {
+      // If "Me" intervenant doesn't exist, show no tasks
+      tasks = [];
+    }
   }
   // In open filter mode, show all open tasks (both assigned and not assigned)
   // No filtering needed - show everything
