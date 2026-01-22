@@ -4,9 +4,14 @@
       <div class="notes-row-meta">
         <span class="notes-task-version">{{ taskVersion }}</span>
         <span>{{ formatRelativeTime(task.updated_at) }}</span>
-        <span v-if="showAssigneeMeta && task.intervenant_id" class="notes-assignee-meta">
-          {{ getTaskAssignee(task)?.name || 'Unknown' }}
-        </span>
+        <div v-if="showAssigneeMeta && task.intervenant_id" class="notes-task-category-badges">
+          <CategoryBadge
+            v-for="category in getIntervenantCategories(getTaskAssignee(task))"
+            :key="category.id"
+            :category="category"
+            variant="header"
+          />
+        </div>
       </div>
       <div v-if="!readOnly" class="notes-task-header-actions">
         <button
@@ -233,10 +238,11 @@ const taskVersion = computed(() => {
 }
 
 
-.notes-assignee-meta {
-  font-size: 11px;
-  color: var(--notes-muted);
-  font-weight: 400;
+.notes-task-category-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .notes-clickable {
