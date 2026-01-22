@@ -19,14 +19,6 @@
         >
           Non assignée <span class="notes-count-badge">{{ unassignedTasksCount }}</span>
         </button>
-        <button
-          class="notes-filter-badge"
-          :class="{ active: filterMode === 'assignee' }"
-          type="button"
-          @click="filterMode = 'assignee'"
-        >
-          Assignee
-        </button>
       </div>
     </div>
 
@@ -43,7 +35,7 @@
         :categories="categories"
         :visits="visits"
         :show-category-badges="filterMode === 'date'"
-        :show-assignee-meta="filterMode === 'open' || filterMode === 'assignee'"
+        :show-assignee-meta="filterMode === 'open'"
         :show-unassigned-badge="filterMode === 'open'"
         @task-click="$emit('task-click', $event)"
         @task-menu-click="$emit('task-menu-click', $event)"
@@ -91,7 +83,7 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
 }>();
 
-const filterMode = ref<"open" | "assignee" | "date">("open");
+const filterMode = ref<"open" | "date">("open");
 
 // Constants
 const UNASSIGNED_LABEL = "Not assigned";
@@ -136,26 +128,12 @@ const sortedTasks = computed(() => {
   if (filterMode.value === "date") {
     // In date filter mode, only show not assigned tasks
     tasks = tasks.filter((task) => !task.intervenant_id);
-  } else if (filterMode.value === "assignee") {
-    // In assignee filter mode, only show assigned tasks (exclude not assigned)
-    tasks = tasks.filter((task) => task.intervenant_id != null);
   }
   // In open filter mode, show all open tasks (both assigned and not assigned)
   // No filtering needed - show everything
   
-  if (filterMode.value === "assignee") {
-    return tasks.sort((a, b) => {
-      const aName = getAssigneeDisplayName(a);
-      const bName = getAssigneeDisplayName(b);
-      if (aName === bName) {
-        return a.created_at.localeCompare(b.created_at);
-      }
-      return aName.localeCompare(bName);
-    });
-  } else {
-    // By date (descending - newest first, oldest last)
-    return tasks.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }
+  // By date (descending - newest first, oldest last)
+  return tasks.sort((a, b) => b.created_at.localeCompare(a.created_at));
 });
 
 const getIntervenantCategories = (intervenant: Intervenant | null) => {
@@ -163,86 +141,6 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   return props.categories.filter((c) => intervenant.category_ids?.includes(c.id));
 };
 
-const groupedTasksByAssignee = computed(() => {
-  if (filterMode.value !== "assignee") return null;
-  
-  const groups: Array<{ assigneeName: string; assigneeId: string | null; assigneeCategories: Category[]; tasks: Task[] }> = [];
-  const assigneeMap = new Map<string | null, Task[]>();
-  
-  // Group tasks by assignee ID
-  sortedTasks.value.forEach((task) => {
-    const assigneeId = getAssigneeId(task);
-    
-    if (!assigneeMap.has(assigneeId)) {
-      assigneeMap.set(assigneeId, []);
-    }
-    assigneeMap.get(assigneeId)!.push(task);
-  });
-  
-  // Convert to array and create group objects
-  assigneeMap.forEach((tasks, assigneeId) => {
-    const assignee: Intervenant | null = isUnassigned(assigneeId) 
-      ? null 
-      : props.intervenants.find(i => i.id === assigneeId) ?? null;
-    const firstTask = tasks[0];
-    
-    groups.push({
-      assigneeName: getAssigneeDisplayName(firstTask),
-      assigneeId: isUnassigned(assigneeId) ? null : assigneeId,
-      assigneeCategories: getIntervenantCategories(assignee),
-      tasks,
-    });
-  });
-  
-  // Sort groups alphabetically
-  return groups.sort((a, b) => {
-    return a.assigneeName.localeCompare(b.assigneeName);
-  });
-});
-
-const visitNumberMap = computed(() => {
-  const map = new Map<string, number | undefined>();
-  props.visits.forEach((visit) => {
-    map.set(visit.id, visit.visit_number);
-  });
-  return map;
-});
-
-const groupedTasksByVisit = computed(() => {
-  if (filterMode.value !== "date") return null;
-  
-  const groups: Array<{ visitNumber: number | undefined; visitId: string | null; visitDate: string | null; tasks: Task[] }> = [];
-  const visitMap = new Map<string | null, Task[]>();
-  
-  sortedTasks.value.forEach((task) => {
-    // Use opened_visit_id if available, otherwise visit_id
-    const taskVisitId = task.opened_visit_id || task.visit_id || null;
-    
-    if (!visitMap.has(taskVisitId)) {
-      visitMap.set(taskVisitId, []);
-    }
-    visitMap.get(taskVisitId)!.push(task);
-  });
-  
-  // Convert to array and sort by visit number (ascending, older first)
-  visitMap.forEach((tasks, visitId) => {
-    const visit = visitId ? props.visits.find(v => v.id === visitId) : null;
-    groups.push({
-      visitNumber: visit?.visit_number,
-      visitId,
-      visitDate: visit?.date || null,
-      tasks: tasks.sort((a, b) => a.created_at.localeCompare(b.created_at)), // Sort tasks within group by date
-    });
-  });
-  
-  // Sort groups: null/undefined visit numbers last, others by visit number ascending (older first)
-  return groups.sort((a, b) => {
-    if (a.visitNumber == null && b.visitNumber == null) return 0;
-    if (a.visitNumber == null) return 1;
-    if (b.visitNumber == null) return -1;
-    return a.visitNumber - b.visitNumber; // Ascending order (older first)
-  });
-});
 </script>
 
 <style>
