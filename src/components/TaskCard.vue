@@ -4,11 +4,20 @@
       <div class="notes-row-meta">
         <span class="notes-task-version">{{ taskVersion }}</span>
         <span>{{ formatRelativeTime(task.updated_at) }}</span>
+        <span v-if="showAssigneeMeta && task.intervenant_id" class="notes-assignee-meta">
+          {{ getTaskAssignee(task)?.name || 'Unknown' }}
+        </span>
       </div>
-      <div class="notes-task-header-actions">
-        <template v-if="showAssigneeMeta && task.intervenant_id">
-          <span class="notes-assignee-meta">{{ getTaskAssignee(task)?.name || 'Unknown' }}</span>
-        </template>
+      <div v-if="!readOnly" class="notes-task-header-actions">
+        <button
+          v-if="showAssigneeMeta && task.intervenant_id"
+          class="notes-task-reassign"
+          type="button"
+          @click.stop="$emit('assign-intervenant', task)"
+          aria-label="Reassign intervenant"
+        >
+          Reassign
+        </button>
         <button
           v-else
           class="notes-task-assign"
@@ -19,16 +28,25 @@
           Assign
         </button>
         <button
-          class="notes-task-menu"
+          v-if="task.intervenant_id && task.status === 'open'"
+          class="notes-task-mark-done"
           type="button"
-          @click.stop.prevent="$emit('task-menu-click', task)"
-          aria-label="Task actions"
+          @click.stop="$emit('mark-as-done', task)"
+          aria-label="Mark as done"
         >
-          ⋯
+          ✓
+        </button>
+        <button
+          class="notes-task-delete"
+          type="button"
+          @click.stop="$emit('delete-task', task)"
+          aria-label="Delete task"
+        >
+          ✕
         </button>
       </div>
     </div>
-    <div v-if="task.status === 'open'" class="notes-task-secondary-row">
+    <div v-if="task.status === 'open' && !readOnly" class="notes-task-secondary-row">
       <button
         class="notes-task-secondary-action"
         type="button"
@@ -60,8 +78,9 @@
       <div class="notes-section">
         <div
           v-if="taskContentMap[task.id]?.observations?.length"
-          class="notes-observations notes-observations-clickable"
-          @click.stop="$emit('manage-observations', task)"
+          class="notes-observations"
+          :class="{ 'notes-observations-clickable': !readOnly }"
+          @click.stop="!readOnly && $emit('manage-observations', task)"
         >
           <div
             v-for="(text, index) in taskContentMap[task.id].observations"
@@ -79,9 +98,10 @@
             v-for="(url, index) in taskContentMap[task.id].photos"
             :key="`${task.id}-photo-${index}`"
             class="notes-content-image"
+            :class="{ 'notes-content-image-clickable': !readOnly }"
             :src="url"
             alt="Task photo"
-            @click.stop="$emit('edit-photo', { task, photoIndex: index })"
+            @click.stop="!readOnly && $emit('edit-photo', { task, photoIndex: index })"
           />
         </div>
       </div>
@@ -105,21 +125,24 @@ const props = withDefaults(
     showCategoryBadges?: boolean;
     showAssigneeMeta?: boolean;
     showUnassignedBadge?: boolean;
+    readOnly?: boolean;
   }>(),
   {
     showUnassignedBadge: true,
+    readOnly: false,
   }
 );
 
 const emit = defineEmits<{
   "task-click": [task: Task];
-  "task-menu-click": [task: Task];
   "image-click": [url: string];
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
   "manage-observations": [task: Task];
   "assign-intervenant": [task: Task];
+  "mark-as-done": [task: Task];
+  "delete-task": [task: Task];
 }>();
 
 const UNASSIGNED_LABEL = "Not assigned";
@@ -212,8 +235,8 @@ const taskVersion = computed(() => {
 
 .notes-assignee-meta {
   font-size: 11px;
-  color: var(--notes-text);
-  font-weight: 500;
+  color: var(--notes-muted);
+  font-weight: 400;
 }
 
 .notes-clickable {
@@ -229,7 +252,7 @@ const taskVersion = computed(() => {
 .notes-task-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 16px;
 }
 
 .notes-task-secondary-row {
@@ -291,20 +314,58 @@ const taskVersion = computed(() => {
   border-color: var(--notes-accent);
 }
 
-.notes-task-menu {
+.notes-task-reassign {
   background: transparent;
-  border: none;
-  color: var(--notes-muted);
-  font-size: 18px;
+  border: 1px solid var(--notes-border);
+  color: var(--notes-text);
+  font-size: 11px;
+  font-weight: 500;
   padding: 4px 8px;
   cursor: pointer;
   border-radius: 4px;
   line-height: 1;
+  transition: all 0.2s;
 }
 
-.notes-task-menu:hover {
+.notes-task-reassign:hover {
   background: var(--notes-hover);
-  color: var(--notes-text);
+  border-color: var(--notes-accent);
+}
+
+.notes-task-mark-done {
+  background: transparent;
+  border: 1px solid var(--notes-accent);
+  color: var(--notes-accent);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-mark-done:hover {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+}
+
+.notes-task-delete {
+  background: transparent;
+  border: none;
+  color: #ff6b6b;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-delete:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
 }
 
 .notes-observations {
@@ -338,6 +399,9 @@ const taskVersion = computed(() => {
   aspect-ratio: 1 / 1;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.notes-content-image-clickable {
   cursor: pointer;
 }
 

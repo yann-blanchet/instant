@@ -17,7 +17,7 @@
           type="button"
           @click="filterMode = 'me'"
         >
-          Assign to me
+          assigned to me
         </button>
         <button
           class="notes-filter-badge"
@@ -27,6 +27,14 @@
         >
           Non assignée <span class="notes-count-badge">{{ unassignedTasksCount }}</span>
         </button>
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'summary' }"
+          type="button"
+          @click="filterMode = 'summary'"
+        >
+          Summary
+        </button>
       </div>
     </div>
 
@@ -34,26 +42,63 @@
       <div v-if="sortedTasks.length === 0" class="notes-row notes-row-empty">
         Aucune tâche.
       </div>
-      <TaskCard
-        v-for="task in sortedTasks"
-        :key="task.id"
-        :task="task"
-        :task-content-map="taskContentMap"
-        :intervenants="intervenants"
-        :categories="categories"
-        :visits="visits"
-        :show-category-badges="filterMode === 'date'"
-        :show-assignee-meta="filterMode === 'open' || filterMode === 'me'"
-        :show-unassigned-badge="filterMode === 'open'"
-        @task-click="$emit('task-click', $event)"
-        @task-menu-click="$emit('task-menu-click', $event)"
-        @image-click="$emit('image-click', $event)"
-        @add-text="$emit('add-text', $event)"
-        @add-photo="$emit('add-photo', $event)"
-        @edit-photo="$emit('edit-photo', $event)"
-        @manage-observations="$emit('manage-observations', $event)"
-        @assign-intervenant="$emit('assign-intervenant', $event)"
-      />
+      <template v-if="filterMode === 'summary' && groupedTasksByIntervenant">
+        <div
+          v-for="group in groupedTasksByIntervenant"
+          :key="group.intervenantId || 'unassigned'"
+          class="notes-assignee-group"
+        >
+          <div class="notes-assignee-header">
+            <span class="notes-assignee-header-name">{{ group.intervenantName }}</span>
+            <div v-if="group.intervenantCategories.length > 0" class="notes-assignee-header-badges">
+              <CategoryBadge
+                v-for="category in group.intervenantCategories"
+                :key="category.id"
+                :category="category"
+                variant="header"
+              />
+            </div>
+          </div>
+          <TaskCard
+            v-for="task in group.tasks"
+            :key="task.id"
+            :task="task"
+            :task-content-map="taskContentMap"
+            :intervenants="intervenants"
+            :categories="categories"
+            :visits="visits"
+            :show-category-badges="false"
+            :show-assignee-meta="false"
+            :show-unassigned-badge="false"
+            :read-only="true"
+            @task-click="$emit('task-click', $event)"
+            @image-click="$emit('image-click', $event)"
+          />
+        </div>
+      </template>
+      <template v-else>
+        <TaskCard
+          v-for="task in sortedTasks"
+          :key="task.id"
+          :task="task"
+          :task-content-map="taskContentMap"
+          :intervenants="intervenants"
+          :categories="categories"
+          :visits="visits"
+          :show-category-badges="filterMode === 'date'"
+          :show-assignee-meta="filterMode === 'open' || filterMode === 'me'"
+          :show-unassigned-badge="filterMode === 'open'"
+          @task-click="$emit('task-click', $event)"
+          @image-click="$emit('image-click', $event)"
+          @add-text="$emit('add-text', $event)"
+          @add-photo="$emit('add-photo', $event)"
+          @edit-photo="$emit('edit-photo', $event)"
+          @manage-observations="$emit('manage-observations', $event)"
+          @assign-intervenant="$emit('assign-intervenant', $event)"
+          @mark-as-done="$emit('mark-as-done', $event)"
+          @delete-task="$emit('delete-task', $event)"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -82,16 +127,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "task-click": [task: Task];
-  "task-menu-click": [task: Task];
   "image-click": [url: string];
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
   "manage-observations": [task: Task];
   "assign-intervenant": [task: Task];
+  "mark-as-done": [task: Task];
+  "delete-task": [task: Task];
 }>();
 
-const filterMode = ref<"open" | "me" | "date">("open");
+const filterMode = ref<"open" | "me" | "date" | "summary">("open");
 
 // Constants
 const UNASSIGNED_LABEL = "Not assigned";
@@ -148,12 +194,58 @@ const sortedTasks = computed(() => {
       // If "Me" intervenant doesn't exist, show no tasks
       tasks = [];
     }
+  } else if (filterMode.value === "summary") {
+    // In summary mode, show all tasks (will be grouped by intervenant)
+    // No filtering needed
   }
   // In open filter mode, show all open tasks (both assigned and not assigned)
   // No filtering needed - show everything
   
   // By date (descending - newest first, oldest last)
   return tasks.sort((a, b) => b.created_at.localeCompare(a.created_at));
+});
+
+const groupedTasksByIntervenant = computed(() => {
+  if (filterMode.value !== "summary") return null;
+  
+  const groups: Array<{ 
+    intervenantName: string; 
+    intervenantId: string | null; 
+    intervenantCategories: Category[]; 
+    tasks: Task[] 
+  }> = [];
+  const intervenantMap = new Map<string | null, Task[]>();
+  
+  // Group tasks by intervenant ID
+  sortedTasks.value.forEach((task) => {
+    const intervenantId = task.intervenant_id || null;
+    
+    if (!intervenantMap.has(intervenantId)) {
+      intervenantMap.set(intervenantId, []);
+    }
+    intervenantMap.get(intervenantId)!.push(task);
+  });
+  
+  // Convert to array and create group objects
+  intervenantMap.forEach((tasks, intervenantId) => {
+    const intervenant: Intervenant | null = intervenantId 
+      ? props.intervenants.find(i => i.id === intervenantId) ?? null
+      : null;
+    
+    const intervenantName = intervenant?.name || UNASSIGNED_LABEL;
+    
+    groups.push({
+      intervenantName,
+      intervenantId: intervenantId,
+      intervenantCategories: getIntervenantCategories(intervenant),
+      tasks: tasks.sort((a, b) => b.created_at.localeCompare(a.created_at)), // Sort by date descending
+    });
+  });
+  
+  // Sort groups alphabetically by intervenant name
+  return groups.sort((a, b) => {
+    return a.intervenantName.localeCompare(b.intervenantName);
+  });
 });
 
 const getIntervenantCategories = (intervenant: Intervenant | null) => {

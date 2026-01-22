@@ -54,13 +54,14 @@
       :task-content-map="taskContentMap"
       status="open"
       @task-click="openTask"
-      @task-menu-click="openTaskActionsSheet"
       @image-click="openImageModal"
       @add-text="handleAddTextToTask"
       @add-photo="handleAddPhotoToTask"
       @edit-photo="handleEditPhoto"
       @manage-observations="handleManageObservations"
       @assign-intervenant="handleAssignIntervenant"
+      @mark-as-done="handleMarkAsDone"
+      @delete-task="handleDeleteTask"
     />
 
     <div class="notes-bottom-bar">
@@ -257,7 +258,6 @@
           title="Done observations"
           :in-sheet="true"
           @task-click="openTask"
-          @task-menu-click="openTaskActionsSheet"
           @image-click="openImageModal"
           @add-text="handleAddTextToTask"
           @add-photo="handleAddPhotoToTask"
@@ -1254,6 +1254,18 @@ const toggleTaskStatus = async (task: Task) => {
     done_visit_id: doneVisitId,
     updated_at: nowIso(),
   });
+};
+
+const handleMarkAsDone = async (task: Task) => {
+  if (!task.intervenant_id) {
+    showToast("Assign an intervenant before closing this observation");
+    return;
+  }
+  await toggleTaskStatus(task);
+};
+
+const handleDeleteTask = async (task: Task) => {
+  await deleteTask(task);
 };
 
 const deleteTask = async (task: Task) => {
