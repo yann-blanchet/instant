@@ -14,40 +14,52 @@
         </div>
       </div>
       <div v-if="!readOnly" class="notes-task-header-actions">
+        <!-- Desktop: Show individual buttons -->
+        <div class="notes-task-header-actions-desktop">
+          <button
+            v-if="showAssigneeMeta && task.intervenant_id"
+            class="notes-task-reassign"
+            type="button"
+            @click.stop="$emit('assign-intervenant', task)"
+            aria-label="Reassign intervenant"
+          >
+            Reassign
+          </button>
+          <button
+            v-else
+            class="notes-task-assign"
+            type="button"
+            @click.stop="$emit('assign-intervenant', task)"
+            aria-label="Assign intervenant"
+          >
+            Assign
+          </button>
+          <button
+            v-if="task.intervenant_id && task.status === 'open'"
+            class="notes-task-mark-done"
+            type="button"
+            @click.stop="$emit('mark-as-done', task)"
+            aria-label="Mark as done"
+          >
+            ✓
+          </button>
+          <button
+            class="notes-task-delete"
+            type="button"
+            @click.stop="$emit('delete-task', task)"
+            aria-label="Delete task"
+          >
+            ✕
+          </button>
+        </div>
+        <!-- Mobile: Show 3-dots menu -->
         <button
-          v-if="showAssigneeMeta && task.intervenant_id"
-          class="notes-task-reassign"
+          class="notes-task-menu"
           type="button"
-          @click.stop="$emit('assign-intervenant', task)"
-          aria-label="Reassign intervenant"
+          @click.stop.prevent="$emit('task-menu-click', task)"
+          aria-label="Task actions"
         >
-          Reassign
-        </button>
-        <button
-          v-else
-          class="notes-task-assign"
-          type="button"
-          @click.stop="$emit('assign-intervenant', task)"
-          aria-label="Assign intervenant"
-        >
-          Assign
-        </button>
-        <button
-          v-if="task.intervenant_id && task.status === 'open'"
-          class="notes-task-mark-done"
-          type="button"
-          @click.stop="$emit('mark-as-done', task)"
-          aria-label="Mark as done"
-        >
-          ✓
-        </button>
-        <button
-          class="notes-task-delete"
-          type="button"
-          @click.stop="$emit('delete-task', task)"
-          aria-label="Delete task"
-        >
-          ✕
+          ⋯
         </button>
       </div>
     </div>
@@ -140,6 +152,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "task-click": [task: Task];
+  "task-menu-click": [task: Task];
   "image-click": [url: string];
   "add-text": [task: Task];
   "add-photo": [task: Task];
@@ -259,6 +272,40 @@ const taskVersion = computed(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.notes-task-header-actions-desktop {
+  display: none;
+  align-items: center;
+  gap: 16px;
+}
+
+.notes-task-menu {
+  display: block;
+  background: transparent;
+  border: none;
+  color: var(--notes-muted);
+  font-size: 18px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-menu:hover {
+  background: var(--notes-hover);
+  color: var(--notes-text);
+}
+
+@media (min-width: 768px) {
+  .notes-task-header-actions-desktop {
+    display: flex;
+  }
+  
+  .notes-task-menu {
+    display: none;
+  }
 }
 
 .notes-task-secondary-row {

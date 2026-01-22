@@ -93,11 +93,12 @@
           @add-text="$emit('add-text', $event)"
           @add-photo="$emit('add-photo', $event)"
           @edit-photo="$emit('edit-photo', $event)"
-          @manage-observations="$emit('manage-observations', $event)"
-          @assign-intervenant="$emit('assign-intervenant', $event)"
-          @mark-as-done="$emit('mark-as-done', $event)"
-          @delete-task="$emit('delete-task', $event)"
-        />
+        @manage-observations="$emit('manage-observations', $event)"
+        @assign-intervenant="$emit('assign-intervenant', $event)"
+        @task-menu-click="$emit('task-menu-click', $event)"
+        @mark-as-done="$emit('mark-as-done', $event)"
+        @delete-task="$emit('delete-task', $event)"
+      />
       </template>
     </div>
   </div>
@@ -127,6 +128,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "task-click": [task: Task];
+  "task-menu-click": [task: Task];
   "image-click": [url: string];
   "add-text": [task: Task];
   "add-photo": [task: Task];
@@ -135,9 +137,14 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
   "mark-as-done": [task: Task];
   "delete-task": [task: Task];
+  "filter-mode-change": [mode: "open" | "me" | "date" | "summary"];
 }>();
 
 const filterMode = ref<"open" | "me" | "date" | "summary">("open");
+
+watch(filterMode, (newMode) => {
+  emit("filter-mode-change", newMode);
+}, { immediate: true });
 
 // Constants
 const UNASSIGNED_LABEL = "Not assigned";

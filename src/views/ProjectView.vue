@@ -60,11 +60,13 @@
       @edit-photo="handleEditPhoto"
       @manage-observations="handleManageObservations"
       @assign-intervenant="handleAssignIntervenant"
+      @task-menu-click="openTaskActionsSheet"
       @mark-as-done="handleMarkAsDone"
       @delete-task="handleDeleteTask"
+      @filter-mode-change="handleFilterModeChange"
     />
 
-    <div class="notes-bottom-bar">
+    <div v-if="currentFilterMode !== 'summary'" class="notes-bottom-bar">
       <button class="notes-bottom-icon" type="button" @click="openAddTaskWithText" aria-label="Add text observation">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -97,8 +99,37 @@
     >
       <div class="notes-sheet" @click.stop>
         <div class="notes-list notes-task-actions-list">
-          <button class="notes-sheet-row" type="button" @click="handleTaskActionToggleStatus">
-            {{ taskActionsTask?.status === "done" ? "Mark as open" : "Mark as done" }}
+          <button
+            v-if="taskActionsTask?.intervenant_id"
+            class="notes-sheet-row"
+            type="button"
+            @click="handleTaskActionReassign"
+          >
+            Reassign
+          </button>
+          <button
+            v-else
+            class="notes-sheet-row"
+            type="button"
+            @click="handleTaskActionAssign"
+          >
+            Assign
+          </button>
+          <button
+            v-if="taskActionsTask?.intervenant_id && taskActionsTask?.status === 'open'"
+            class="notes-sheet-row"
+            type="button"
+            @click="handleTaskActionToggleStatus"
+          >
+            Mark as done
+          </button>
+          <button
+            v-if="taskActionsTask?.status === 'done'"
+            class="notes-sheet-row"
+            type="button"
+            @click="handleTaskActionToggleStatus"
+          >
+            Mark as open
           </button>
           <button
             class="notes-sheet-row notes-sheet-row-danger"
@@ -121,6 +152,47 @@
     <!-- Toast notification -->
     <div v-if="toastMessage" class="notes-toast">
       {{ toastMessage }}
+    </div>
+
+    <!-- Delete confirmation sheet -->
+    <div
+      v-if="isDeleteConfirmSheetOpen"
+      class="notes-sheet-backdrop"
+      @click="closeDeleteConfirmSheet"
+    >
+      <div class="notes-sheet" @click.stop>
+        <div class="notes-sheet-header">
+          <h3 class="notes-sheet-title">Delete task</h3>
+          <button
+            class="notes-sheet-close"
+            type="button"
+            aria-label="Close"
+            @click="closeDeleteConfirmSheet"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="notes-delete-confirm-content">
+          <p v-if="deletingTask?.intervenant_id" class="notes-delete-confirm-message">
+            This task is assigned to <strong>{{ getTaskAssigneeName(deletingTask) }}</strong>. Are you sure you want to delete it?
+          </p>
+          <p v-else class="notes-delete-confirm-message">
+            Are you sure you want to delete this task?
+          </p>
+        </div>
+        <div class="notes-sheet-actions">
+          <button class="notes-button" type="button" @click="closeDeleteConfirmSheet">
+            Cancel
+          </button>
+          <button
+            class="notes-button notes-button-danger"
+            type="button"
+            @click="confirmDeleteTask"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
 
     <div
@@ -352,6 +424,9 @@ const managingTaskId = ref<string | null>(null);
 const editingObservationIndex = ref<number | null>(null);
 const isIntervenantAssignSheetOpen = ref(false);
 const assigningTaskId = ref<Task | null>(null);
+const currentFilterMode = ref<"open" | "me" | "date" | "summary">("open");
+const isDeleteConfirmSheetOpen = ref(false);
+const deletingTask = ref<Task | null>(null);
 
 const managingTaskObservations = computed(() => {
   if (!managingTaskId.value) return [];
@@ -422,6 +497,12 @@ const getTaskAssignee = (task: Task) => {
   return intervenants.value.find((i) => i.id === task.intervenant_id) ?? null;
 };
 
+const getTaskAssigneeName = (task: Task | null): string => {
+  if (!task?.intervenant_id) return "Not assigned";
+  const assignee = intervenants.value.find((i) => i.id === task.intervenant_id);
+  return assignee?.name || "Unknown";
+};
+
 const getIntervenantCategories = (intervenant: Intervenant | null) => {
   if (!intervenant?.category_ids || intervenant.category_ids.length === 0) return [];
   return categories.value.filter((c) => intervenant.category_ids?.includes(c.id));
@@ -488,6 +569,18 @@ const showToast = (message: string) => {
   }, 3000);
 };
 
+const handleTaskActionAssign = () => {
+  if (!taskActionsTask.value) return;
+  closeTaskActionsSheet();
+  handleAssignIntervenant(taskActionsTask.value);
+};
+
+const handleTaskActionReassign = () => {
+  if (!taskActionsTask.value) return;
+  closeTaskActionsSheet();
+  handleAssignIntervenant(taskActionsTask.value);
+};
+
 const handleTaskActionToggleStatus = async () => {
   if (!taskActionsTask.value) return;
   // Prevent marking unassigned tasks as done and show message
@@ -499,10 +592,10 @@ const handleTaskActionToggleStatus = async () => {
   closeTaskActionsSheet();
 };
 
-const handleTaskActionDelete = async () => {
+const handleTaskActionDelete = () => {
   if (!taskActionsTask.value) return;
-  await deleteTask(taskActionsTask.value);
   closeTaskActionsSheet();
+  handleDeleteTask(taskActionsTask.value);
 };
 
 
@@ -1264,8 +1357,24 @@ const handleMarkAsDone = async (task: Task) => {
   await toggleTaskStatus(task);
 };
 
-const handleDeleteTask = async (task: Task) => {
-  await deleteTask(task);
+const handleDeleteTask = (task: Task) => {
+  deletingTask.value = task;
+  isDeleteConfirmSheetOpen.value = true;
+};
+
+const closeDeleteConfirmSheet = () => {
+  isDeleteConfirmSheetOpen.value = false;
+  deletingTask.value = null;
+};
+
+const confirmDeleteTask = async () => {
+  if (!deletingTask.value) return;
+  await deleteTask(deletingTask.value);
+  closeDeleteConfirmSheet();
+};
+
+const handleFilterModeChange = (mode: "open" | "me" | "date" | "summary") => {
+  currentFilterMode.value = mode;
 };
 
 const deleteTask = async (task: Task) => {
@@ -1576,6 +1685,88 @@ const deleteTask = async (task: Task) => {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+.notes-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.notes-sheet-close {
+  background: transparent;
+  border: none;
+  color: var(--notes-muted);
+  font-size: 20px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.notes-sheet-close:hover {
+  background: var(--notes-hover);
+  color: var(--notes-text);
+}
+
+.notes-delete-confirm-content {
+  padding: 16px 0;
+}
+
+.notes-delete-confirm-message {
+  font-size: 14px;
+  color: var(--notes-text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.notes-delete-confirm-message strong {
+  font-weight: 600;
+  color: var(--notes-text);
+}
+
+.notes-sheet-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.notes-button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--notes-border);
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notes-button:hover {
+  background: var(--notes-hover);
+}
+
+.notes-button-primary {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
+  border-color: var(--notes-accent);
+}
+
+.notes-button-primary:hover {
+  opacity: 0.9;
+}
+
+.notes-button-danger {
+  background: #ff6b6b;
+  color: #fff;
+  border-color: #ff6b6b;
+}
+
+.notes-button-danger:hover {
+  background: #ff5252;
 }
 
 .notes-sheet-title {
