@@ -9,7 +9,7 @@
           type="button"
           @click="filterMode = 'date'"
         >
-          Date
+          Non assignée
         </button>
         <button
           class="notes-filter-badge"
@@ -51,39 +51,8 @@
             :intervenants="intervenants"
             :categories="categories"
             :show-category-badges="filterMode === 'date'"
-            :show-assignee-meta="filterMode !== 'assignee'"
-            @task-click="$emit('task-click', $event)"
-            @task-menu-click="$emit('task-menu-click', $event)"
-            @image-click="$emit('image-click', $event)"
-            @add-text="$emit('add-text', $event)"
-            @add-photo="$emit('add-photo', $event)"
-            @edit-photo="$emit('edit-photo', $event)"
-            @manage-observations="$emit('manage-observations', $event)"
-            @assign-intervenant="$emit('assign-intervenant', $event)"
-          />
-        </div>
-      </template>
-      <template v-else-if="filterMode === 'date' && groupedTasksByVisit">
-        <div
-          v-for="group in groupedTasksByVisit"
-          :key="group.visitId || '__novisit__'"
-          class="notes-visit-group"
-        >
-          <div class="notes-visit-header">
-            <span class="notes-visit-header-name">
-              {{ group.visitNumber != null ? `Visite ${formatVisitNumber(group.visitNumber)}` : "Sans visite" }}
-              <span v-if="group.visitDate" class="notes-visit-header-date"> · {{ formatDate(group.visitDate) }}</span>
-            </span>
-          </div>
-          <TaskCard
-            v-for="task in group.tasks"
-            :key="task.id"
-            :task="task"
-            :task-content-map="taskContentMap"
-            :intervenants="intervenants"
-            :categories="categories"
-            :show-category-badges="filterMode === 'date'"
-            :show-assignee-meta="filterMode !== 'assignee'"
+            :show-assignee-meta="false"
+            :show-unassigned-badge="false"
             @task-click="$emit('task-click', $event)"
             @task-menu-click="$emit('task-menu-click', $event)"
             @image-click="$emit('image-click', $event)"
@@ -104,7 +73,8 @@
           :intervenants="intervenants"
           :categories="categories"
           :show-category-badges="filterMode === 'date'"
-          :show-assignee-meta="filterMode !== 'assignee'"
+          :show-assignee-meta="filterMode === 'assignee'"
+          :show-unassigned-badge="true"
           @task-click="$emit('task-click', $event)"
           @task-menu-click="$emit('task-menu-click', $event)"
           @image-click="$emit('image-click', $event)"
@@ -186,7 +156,18 @@ const assignedTasks = computed(() => {
 });
 
 const sortedTasks = computed(() => {
-  const tasks = [...filteredTasks.value];
+  let tasks = [...filteredTasks.value];
+  
+  // In date filter mode, only show not assigned tasks
+  if (filterMode.value === "date") {
+    tasks = tasks.filter((task) => !task.intervenant_id);
+  }
+  
+  // In assignee filter mode, only show assigned tasks (exclude not assigned)
+  if (filterMode.value === "assignee") {
+    tasks = tasks.filter((task) => task.intervenant_id != null);
+  }
+  
   if (filterMode.value === "assignee") {
     return tasks.sort((a, b) => {
       const aName = getAssigneeDisplayName(a);
@@ -194,9 +175,6 @@ const sortedTasks = computed(() => {
       if (aName === bName) {
         return a.created_at.localeCompare(b.created_at);
       }
-      // Unassigned always goes last
-      if (aName === UNASSIGNED_LABEL) return 1;
-      if (bName === UNASSIGNED_LABEL) return -1;
       return aName.localeCompare(bName);
     });
   } else {
@@ -241,10 +219,8 @@ const groupedTasksByAssignee = computed(() => {
     });
   });
   
-  // Sort groups: Unassigned last, others alphabetically
+  // Sort groups alphabetically
   return groups.sort((a, b) => {
-    if (a.assigneeName === UNASSIGNED_LABEL) return 1;
-    if (b.assigneeName === UNASSIGNED_LABEL) return -1;
     return a.assigneeName.localeCompare(b.assigneeName);
   });
 });

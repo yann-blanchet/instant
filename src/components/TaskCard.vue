@@ -11,7 +11,7 @@
           </span>
         </div>
         <div
-          v-if="showCategoryBadges && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))"
+          v-if="showCategoryBadges && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || (!getTaskAssignee(task) && showUnassignedBadge))"
           class="notes-task-category-badges"
           @click.stop="$emit('assign-intervenant', task)"
         >
@@ -24,7 +24,7 @@
             />
           </template>
         <CategoryBadge
-          v-else-if="!getTaskAssignee(task)"
+          v-else-if="!getTaskAssignee(task) && showUnassignedBadge"
           :label="UNASSIGNED_LABEL"
           variant="task"
         />
@@ -114,14 +114,20 @@ import type { Category, Intervenant, Task } from "../db/types";
 import { formatRelativeTime } from "../utils/format";
 import CategoryBadge from "./CategoryBadge.vue";
 
-const props = defineProps<{
-  task: Task;
-  taskContentMap: Record<string, { observations: string[]; photos: string[]; photoIds: string[] }>;
-  intervenants: Intervenant[];
-  categories: Category[];
-  showCategoryBadges?: boolean;
-  showAssigneeMeta?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    task: Task;
+    taskContentMap: Record<string, { observations: string[]; photos: string[]; photoIds: string[] }>;
+    intervenants: Intervenant[];
+    categories: Category[];
+    showCategoryBadges?: boolean;
+    showAssigneeMeta?: boolean;
+    showUnassignedBadge?: boolean;
+  }>(),
+  {
+    showUnassignedBadge: true,
+  }
+);
 
 const emit = defineEmits<{
   "task-click": [task: Task];
