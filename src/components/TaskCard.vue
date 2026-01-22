@@ -1,5 +1,39 @@
 <template>
   <div class="notes-row notes-task-row">
+    <div class="notes-task-header" @click="$emit('task-click', task)">
+      <div
+        v-if="showCategoryBadges && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))"
+        class="notes-task-category-badges"
+      >
+        <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
+          <CategoryBadge
+            v-for="category in getIntervenantCategories(getTaskAssignee(task))"
+            :key="category.id"
+            :category="category"
+            variant="task"
+          />
+        </template>
+        <CategoryBadge
+          v-else-if="!getTaskAssignee(task)"
+          :label="UNASSIGNED_LABEL"
+          variant="task"
+        />
+      </div>
+      <div class="notes-row-meta">
+        <span v-if="showAssigneeMeta && getTaskAssignee(task)" class="notes-assignee-meta">
+          {{ getTaskAssignee(task)?.name }}
+        </span>
+        <span>{{ formatRelativeTime(task.updated_at) }}</span>
+      </div>
+      <button
+        class="notes-task-menu"
+        type="button"
+        @click.stop.prevent="$emit('task-menu-click', task)"
+        aria-label="Task actions"
+      >
+        ⋯
+      </button>
+    </div>
     <div class="notes-row-text">
       <div class="notes-section">
         <div class="notes-section-header">
@@ -62,40 +96,6 @@
         </div>
       </div>
     </div>
-    <div class="notes-task-bottom" @click="$emit('task-click', task)">
-      <div
-        v-if="showCategoryBadges && (getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0 || !getTaskAssignee(task))"
-        class="notes-task-category-badges"
-      >
-        <template v-if="getTaskAssignee(task) && getIntervenantCategories(getTaskAssignee(task)).length > 0">
-          <CategoryBadge
-            v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-            :key="category.id"
-            :category="category"
-            variant="task"
-          />
-        </template>
-        <CategoryBadge
-          v-else-if="!getTaskAssignee(task)"
-          :label="UNASSIGNED_LABEL"
-          variant="task"
-        />
-      </div>
-      <div class="notes-row-meta">
-        <span v-if="showAssigneeMeta && getTaskAssignee(task)" class="notes-assignee-meta">
-          {{ getTaskAssignee(task)?.name }}
-        </span>
-        <span>{{ formatRelativeTime(task.updated_at) }}</span>
-      </div>
-      <button
-        class="notes-task-menu"
-        type="button"
-        @click.stop.prevent="$emit('task-menu-click', task)"
-        aria-label="Task actions"
-      >
-        ⋯
-      </button>
-    </div>
   </div>
 </template>
 
@@ -156,26 +156,25 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   min-height: 60px;
 }
 
-.notes-task-bottom {
+.notes-task-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid var(--notes-border);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--notes-border);
   flex-wrap: wrap;
   cursor: pointer;
   transition: background-color 0.2s;
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px 8px 0 0;
   margin-left: -12px;
   margin-right: -12px;
-  margin-bottom: -10px;
+  margin-top: -10px;
   padding-left: 12px;
   padding-right: 12px;
-  padding-bottom: 10px;
+  padding-top: 10px;
 }
 
-.notes-task-bottom:hover {
+.notes-task-header:hover {
   background: var(--notes-hover);
 }
 
