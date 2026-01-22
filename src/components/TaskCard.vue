@@ -23,11 +23,11 @@
               variant="task"
             />
           </template>
-          <CategoryBadge
-            v-else-if="!getTaskAssignee(task)"
-            :label="UNASSIGNED_LABEL"
-            variant="task"
-          />
+        <CategoryBadge
+          v-else-if="!getTaskAssignee(task)"
+          :label="UNASSIGNED_LABEL"
+          variant="task"
+        />
         </div>
       </div>
       <div class="notes-task-header-right">
@@ -134,7 +134,7 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
 }>();
 
-const UNASSIGNED_LABEL = "Générale";
+const UNASSIGNED_LABEL = "Not assigned";
 
 const getTaskAssignee = (task: Task): Intervenant | null => {
   if (!task.intervenant_id) return null;

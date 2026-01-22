@@ -335,6 +335,7 @@
       :current-intervenant-id="assigningTaskId?.intervenant_id"
       @close="closeIntervenantAssignSheet"
       @assign="handleAssignIntervenantToTask"
+      @create-generale="handleCreateGeneraleIntervenant"
     />
   </section>
 </template>
@@ -1092,6 +1093,51 @@ const handleAssignIntervenantToTask = async (intervenantId: string | null) => {
     intervenant_id: intervenantId,
     updated_at: nowIso(),
   });
+  closeIntervenantAssignSheet();
+};
+
+const handleCreateGeneraleIntervenant = async () => {
+  // Check if Générale intervenant already exists globally
+  const existingGenerale = await db.intervenants
+    .filter((i) => i.name.toLowerCase() === "générale" || i.name.toLowerCase() === "generale")
+    .first();
+  
+  let generaleId: string;
+  
+  if (existingGenerale) {
+    generaleId = existingGenerale.id;
+  } else {
+    // Create Générale intervenant
+    const timestamp = nowIso();
+    generaleId = makeId();
+    await db.intervenants.add({
+      id: generaleId,
+      name: "Générale",
+      email: null,
+      phone: null,
+      category_ids: [],
+      created_at: timestamp,
+      updated_at: timestamp,
+      deleted_at: null,
+    });
+  }
+  
+  // Add to project if not already in project
+  if (project.value && !project.value.intervenant_ids?.includes(generaleId)) {
+    await db.projects.update(project.value.id, {
+      intervenant_ids: [...(project.value.intervenant_ids || []), generaleId],
+      updated_at: nowIso(),
+    });
+  }
+  
+  // Assign to task
+  if (assigningTaskId.value) {
+    await db.tasks.update(assigningTaskId.value.id, {
+      intervenant_id: generaleId,
+      updated_at: nowIso(),
+    });
+  }
+  
   closeIntervenantAssignSheet();
 };
 

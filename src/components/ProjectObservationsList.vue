@@ -154,7 +154,7 @@ const emit = defineEmits<{
 const filterMode = ref<"assignee" | "date">("date");
 
 // Constants
-const UNASSIGNED_LABEL = "Générale";
+const UNASSIGNED_LABEL = "Not assigned";
 const UNASSIGNED_ID = "__unassigned__";
 
 // Helper functions

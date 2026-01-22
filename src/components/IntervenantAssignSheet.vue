@@ -15,32 +15,66 @@
       
       <div class="notes-list">
         <div class="notes-sheet-section-label">Intervenants</div>
-        <div class="notes-sheet-chips">
-          <button
-            class="notes-sheet-chip"
-            type="button"
-            :class="{ active: !currentIntervenantId }"
-            @click="handleAssign(null)"
-          >
-            Générale
-          </button>
-          <button
-            v-for="intervenant in intervenants"
-            :key="intervenant.id"
-            class="notes-sheet-chip"
-            :class="{ active: currentIntervenantId === intervenant.id }"
-            :style="getIntervenantCategories(intervenant).length > 0 && getIntervenantCategories(intervenant)[0]?.color ? { borderColor: getIntervenantCategories(intervenant)[0].color } : {}"
-            type="button"
-            @click="handleAssign(intervenant.id)"
-          >
-            <div class="notes-sheet-chip-content">
-              <div class="notes-sheet-chip-name">{{ intervenant.name }}</div>
-              <div v-if="getIntervenantCategories(intervenant).length > 0" class="notes-sheet-chip-category">
-                {{ getIntervenantCategories(intervenant)[0].name }}
-              </div>
+        <button
+          class="notes-sheet-row"
+          type="button"
+          :class="{ active: !currentIntervenantId }"
+          @click="handleAssign(null)"
+        >
+          <div class="notes-sheet-row-content">
+            <div class="notes-sheet-row-name">Not assigned</div>
+          </div>
+        </button>
+        <button
+          v-if="generaleIntervenant"
+          class="notes-sheet-row"
+          type="button"
+          :class="{ active: currentIntervenantId === generaleIntervenant.id }"
+          @click="handleAssign(generaleIntervenant.id)"
+        >
+          <div class="notes-sheet-row-content">
+            <div class="notes-sheet-row-name">{{ generaleIntervenant.name }}</div>
+            <div v-if="getIntervenantCategories(generaleIntervenant).length > 0" class="notes-sheet-row-badges">
+              <CategoryBadge
+                v-for="category in getIntervenantCategories(generaleIntervenant)"
+                :key="category.id"
+                :category="category"
+                variant="header"
+              />
             </div>
-          </button>
-        </div>
+          </div>
+        </button>
+        <button
+          v-else
+          class="notes-sheet-row"
+          type="button"
+          :class="{ active: false }"
+          @click="handleAssignGenerale"
+        >
+          <div class="notes-sheet-row-content">
+            <div class="notes-sheet-row-name">Générale</div>
+          </div>
+        </button>
+        <button
+          v-for="intervenant in otherIntervenants"
+          :key="intervenant.id"
+          class="notes-sheet-row"
+          type="button"
+          :class="{ active: currentIntervenantId === intervenant.id }"
+          @click="handleAssign(intervenant.id)"
+        >
+          <div class="notes-sheet-row-content">
+            <div class="notes-sheet-row-name">{{ intervenant.name }}</div>
+            <div v-if="getIntervenantCategories(intervenant).length > 0" class="notes-sheet-row-badges">
+              <CategoryBadge
+                v-for="category in getIntervenantCategories(intervenant)"
+                :key="category.id"
+                :category="category"
+                variant="header"
+              />
+            </div>
+          </div>
+        </button>
       </div>
     </div>
   </div>
@@ -49,6 +83,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Category, Intervenant } from "../db/types";
+import CategoryBadge from "./CategoryBadge.vue";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -61,9 +96,19 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   close: [];
   assign: [intervenantId: string | null];
+  "create-generale": [];
 }>();
 
 const isOpen = computed(() => props.modelValue);
+
+const generaleIntervenant = computed(() => {
+  return props.intervenants.find((i) => i.name.toLowerCase() === "générale" || i.name.toLowerCase() === "generale");
+});
+
+const otherIntervenants = computed(() => {
+  if (!generaleIntervenant.value) return props.intervenants;
+  return props.intervenants.filter((i) => i.id !== generaleIntervenant.value?.id);
+});
 
 const handleClose = () => {
   emit("update:modelValue", false);
@@ -73,6 +118,10 @@ const handleClose = () => {
 const handleAssign = (intervenantId: string | null) => {
   emit("assign", intervenantId);
   handleClose();
+};
+
+const handleAssignGenerale = () => {
+  emit("create-generale");
 };
 
 const getIntervenantCategories = (intervenant: Intervenant) => {
@@ -150,52 +199,56 @@ const getIntervenantCategories = (intervenant: Intervenant) => {
   letter-spacing: 0.08em;
   color: var(--notes-muted);
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
-.notes-sheet-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.notes-sheet-chip {
+.notes-sheet-row {
+  width: 100%;
   background: var(--notes-panel-strong);
   border: 1px solid var(--notes-border);
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   font-size: 14px;
   color: var(--notes-text);
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
+  margin-bottom: 8px;
 }
 
-.notes-sheet-chip:hover {
+.notes-sheet-row:last-child {
+  margin-bottom: 0;
+}
+
+.notes-sheet-row:hover {
   background: var(--notes-hover);
   border-color: var(--notes-accent);
 }
 
-.notes-sheet-chip.active {
+.notes-sheet-row.active {
   background: var(--notes-accent);
   color: var(--notes-accent-contrast);
   border-color: var(--notes-accent);
   font-weight: 600;
 }
 
-.notes-sheet-chip-content {
+.notes-sheet-row-content {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.notes-sheet-chip-name {
+.notes-sheet-row-name {
   font-size: 14px;
   font-weight: 500;
+  flex: 1;
 }
 
-.notes-sheet-chip-category {
-  font-size: 11px;
-  opacity: 0.8;
+.notes-sheet-row-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 </style>
