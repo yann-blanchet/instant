@@ -43,7 +43,7 @@
             ✕
           </button>
         </div>
-        <!-- Mobile: Show assign button if not assigned, then 3-dots menu -->
+        <!-- Mobile: Show assign button if not assigned, close button if assigned, then 3-dots menu -->
         <div class="notes-task-header-actions-mobile">
           <button
             v-if="!task.intervenant_id"
@@ -53,6 +53,15 @@
             aria-label="Assign intervenant"
           >
             Assign
+          </button>
+          <button
+            v-if="task.intervenant_id && task.status === 'open'"
+            class="notes-task-close-mobile"
+            type="button"
+            @click.stop="$emit('mark-as-done', task)"
+            aria-label="Close task"
+          >
+            Close
           </button>
           <button
             class="notes-task-menu"
@@ -312,6 +321,24 @@ const isCurrentVisit = computed(() => {
 .notes-task-assign-mobile:hover {
   background: var(--notes-hover);
   border-color: var(--notes-accent);
+}
+
+.notes-task-close-mobile {
+  background: transparent;
+  border: 1px solid var(--notes-accent);
+  color: var(--notes-accent);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-close-mobile:hover {
+  background: var(--notes-accent);
+  color: var(--notes-accent-contrast);
 }
 
 @media (min-width: 768px) {
