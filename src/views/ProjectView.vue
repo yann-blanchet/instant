@@ -58,6 +58,7 @@
       @add-text="handleAddTextToTask"
       @add-photo="handleAddPhotoToTask"
       @edit-photo="handleEditPhoto"
+      @manage-photos="handleManagePhotos"
       @manage-observations="handleManageObservations"
       @assign-intervenant="handleAssignIntervenant"
       @task-menu-click="openTaskActionsSheet"
@@ -114,6 +115,14 @@
             @click="handleTaskActionAssign"
           >
             Assign
+          </button>
+          <button
+            v-if="taskActionsTask?.intervenant_id"
+            class="notes-sheet-row"
+            type="button"
+            @click="handleTaskActionUnassign"
+          >
+            Unassign
           </button>
           <button
             v-if="taskActionsTask?.intervenant_id && taskActionsTask?.status === 'open'"
@@ -368,6 +377,16 @@
       @add="handleAddObservation"
     />
 
+    <PhotosSheet
+      v-model="isPhotosSheetOpen"
+      :photos="managingTaskPhotos"
+      @close="closePhotosSheet"
+      @edit="handleEditPhotoFromSheet"
+      @delete="handleDeletePhotoFromSheet"
+      @add="handleAddPhotoToSheet"
+      @view="handleViewPhotoFromSheet"
+    />
+
     <IntervenantAssignSheet
       v-model="isIntervenantAssignSheetOpen"
       :intervenants="projectIntervenantsList"
@@ -391,6 +410,7 @@ import ImageModal from "../components/ImageModal.vue";
 import ImagePicker from "../components/ImagePicker.vue";
 import IntervenantAssignSheet from "../components/IntervenantAssignSheet.vue";
 import ObservationsSheet from "../components/ObservationsSheet.vue";
+import PhotosSheet from "../components/PhotosSheet.vue";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import ProjectObservationsList from "../components/ProjectObservationsList.vue";
@@ -420,6 +440,7 @@ const isPhotoEditorOpen = ref(false);
 const photoEditorSource = ref("");
 const editingPhotoId = ref<string | null>(null);
 const isObservationsSheetOpen = ref(false);
+const isPhotosSheetOpen = ref(false);
 const managingTaskId = ref<string | null>(null);
 const editingObservationIndex = ref<number | null>(null);
 const isIntervenantAssignSheetOpen = ref(false);
@@ -571,14 +592,25 @@ const showToast = (message: string) => {
 
 const handleTaskActionAssign = () => {
   if (!taskActionsTask.value) return;
+  const taskToAssign = taskActionsTask.value;
   closeTaskActionsSheet();
-  handleAssignIntervenant(taskActionsTask.value);
+  handleAssignIntervenant(taskToAssign);
 };
 
 const handleTaskActionReassign = () => {
   if (!taskActionsTask.value) return;
+  const taskToReassign = taskActionsTask.value;
   closeTaskActionsSheet();
-  handleAssignIntervenant(taskActionsTask.value);
+  handleAssignIntervenant(taskToReassign);
+};
+
+const handleTaskActionUnassign = async () => {
+  if (!taskActionsTask.value) return;
+  await db.tasks.update(taskActionsTask.value.id, {
+    intervenant_id: null,
+    updated_at: nowIso(),
+  });
+  closeTaskActionsSheet();
 };
 
 const handleTaskActionToggleStatus = async () => {
@@ -594,8 +626,9 @@ const handleTaskActionToggleStatus = async () => {
 
 const handleTaskActionDelete = () => {
   if (!taskActionsTask.value) return;
+  const taskToDelete = taskActionsTask.value;
   closeTaskActionsSheet();
-  handleDeleteTask(taskActionsTask.value);
+  handleDeleteTask(taskToDelete);
 };
 
 
@@ -870,8 +903,8 @@ const handleImageSelected = async (blob: Blob) => {
       opened_visit_id: visitId,
       done_visit_id: null,
       status: "open",
+      type: "photo",
       intervenant_id: null, // Unassigned by default
-      audio_url: null,
       photo_ids: [photoId],
       observations: [],
       created_at: timestamp,
@@ -982,8 +1015,8 @@ const handleTextSend = async (text: string) => {
       opened_visit_id: visitId,
       done_visit_id: null,
       status: "open",
+      type: "text",
       intervenant_id: null, // Unassigned by default
-      audio_url: null,
       photo_ids: [],
       observations: [text],
       created_at: timestamp,
@@ -1110,10 +1143,118 @@ const handleManageObservations = (task: Task) => {
   isObservationsSheetOpen.value = true;
 };
 
+const handleManagePhotos = (task: Task) => {
+  managingTaskId.value = task.id;
+  isPhotosSheetOpen.value = true;
+};
+
 const closeObservationsSheet = () => {
   isObservationsSheetOpen.value = false;
   managingTaskId.value = null;
   editingObservationIndex.value = null;
+};
+
+const managingTaskPhotos = computed(() => {
+  if (!managingTaskId.value) return [];
+  const task = tasks.value?.find((t) => t.id === managingTaskId.value);
+  if (!task) return [];
+  const taskContent = taskContentMap.value[task.id];
+  return taskContent?.photos ?? [];
+});
+
+const closePhotosSheet = () => {
+  isPhotosSheetOpen.value = false;
+  managingTaskId.value = null;
+};
+
+const handleEditPhotoFromSheet = async (index: number) => {
+  if (!managingTaskId.value) return;
+  const task = tasks.value?.find((t) => t.id === managingTaskId.value);
+  if (!task) return;
+  const taskContent = taskContentMap.value[task.id];
+  if (!taskContent || !taskContent.photoIds || index >= taskContent.photoIds.length) return;
+  
+  const photoId = taskContent.photoIds[index];
+  const photo = await db.task_photos.get(photoId);
+  if (!photo) return;
+  
+  editingPhotoId.value = photoId;
+  editingTaskId.value = managingTaskId.value;
+  isPhotosSheetOpen.value = false;
+  
+  // Load the photo into the editor
+  if (photo.image_blob) {
+    const url = URL.createObjectURL(photo.image_blob);
+    photoEditorSource.value = url;
+    isPhotoEditorOpen.value = true;
+  } else if (photo.url) {
+    photoEditorSource.value = photo.url;
+    isPhotoEditorOpen.value = true;
+  }
+};
+
+const handleDeletePhotoFromSheet = async (index: number) => {
+  if (!managingTaskId.value) return;
+  
+  const task = await db.tasks.get(managingTaskId.value);
+  if (!task) return;
+  
+  const taskContent = taskContentMap.value[task.id];
+  if (!taskContent || !taskContent.photoIds || index >= taskContent.photoIds.length) return;
+  
+  const photoId = taskContent.photoIds[index];
+  await handleDeletePhotoById(photoId);
+};
+
+const handleDeletePhotoById = async (photoId: string) => {
+  const timestamp = nowIso();
+  
+  // Soft delete the photo
+  await db.task_photos.update(photoId, {
+    deleted_at: timestamp,
+    updated_at: timestamp,
+  });
+  
+  // Remove photo_id from task's photo_ids array
+  const task = await db.tasks.get(managingTaskId.value!);
+  if (task) {
+    const currentPhotoIds = task.photo_ids ?? [];
+    const updatedPhotoIds = currentPhotoIds.filter((id) => id !== photoId);
+    await db.tasks.update(managingTaskId.value!, {
+      photo_ids: updatedPhotoIds,
+      updated_at: timestamp,
+    });
+  }
+  
+  // If photo is already synced to Supabase Storage, delete it from storage
+  const photo = await db.task_photos.get(photoId);
+  if (photo?.storage_path) {
+    try {
+      const { supabase } = await import("../supabase");
+      if (supabase) {
+        const { error } = await supabase.storage
+          .from('task-photos')
+          .remove([photo.storage_path]);
+        
+        if (error) {
+          console.error(`[ProjectView] Failed to delete photo from Storage:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[ProjectView] Error deleting photo from Storage:`, error);
+    }
+  }
+};
+
+const handleAddPhotoToSheet = () => {
+  if (!managingTaskId.value) return;
+  editingTaskId.value = managingTaskId.value;
+  isPhotosSheetOpen.value = false;
+  imagePickerRef.value?.open();
+};
+
+const handleViewPhotoFromSheet = (url: string) => {
+  openImageModal(url);
 };
 
 const handleEditObservation = (index: number) => {

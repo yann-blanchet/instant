@@ -503,8 +503,8 @@ const ensureTask = async (visitId: string | null) => {
     opened_visit_id: visitId,
     done_visit_id: null,
     status: "open",
+    type: "text", // Default to text, will be updated when content is added
     intervenant_id: form.intervenant_id,
-    audio_url: null,
     photo_ids: [],
     observations: [],
     created_at: timestamp,
@@ -597,6 +597,7 @@ const handleTextSend = async (text: string) => {
     // Adding new observation
     const nextObservations = [...(task?.observations ?? []), text];
     await db.tasks.update(taskId, {
+      type: "text",
       observations: nextObservations,
       updated_at: nowIso(),
     });
@@ -782,7 +783,11 @@ const sendImage = async (blob: Blob) => {
   
   const task = await db.tasks.get(taskId);
   const nextPhotoIds = [...(task?.photo_ids ?? []), photoId];
-  await db.tasks.update(taskId, { photo_ids: nextPhotoIds, updated_at: timestamp });
+  await db.tasks.update(taskId, { 
+    type: "photo",
+    photo_ids: nextPhotoIds, 
+    updated_at: timestamp 
+  });
   
   // Compress in background (non-blocking) - update when done
   // This provides instant feedback while compression happens async

@@ -10,16 +10,17 @@ export interface Project {
   deleted_at?: string | null;
 }
 
+export type TaskType = "photo" | "text";
+
 export interface Task {
   id: string;
   project_id?: string | null;
   visit_id?: string | null;
   opened_visit_id?: string | null;
   done_visit_id?: string | null;
-  description?: string | null;
   status: TaskStatus;
+  type: TaskType;
   intervenant_id?: string | null;
-  audio_url?: string | null;
   photo_ids?: string[];
   observations?: string[];
   created_at: string;

@@ -250,7 +250,7 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
       delete rest.comment;
     }
     
-    // tasks: map old field names to new ones
+    // tasks: map old field names to new ones and remove unused fields
     if (table === 'tasks') {
       // Map text_list -> observations (if text_list exists and observations doesn't)
       if (rest.text_list && !rest.observations) {
@@ -263,6 +263,10 @@ async function pushToSupabase<T extends { id: string; updated_at: string }>(
         rest.photo_ids = rest.photo_list;
       }
       delete rest.photo_list;
+      
+      // Remove unused fields that were removed from schema
+      delete rest.description;
+      delete rest.audio_url;
     }
     
     // task_photos: skip records with null url (upload to Storage failed)

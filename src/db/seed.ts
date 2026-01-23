@@ -62,6 +62,7 @@ export async function seedIfEmpty() {
     opened_visit_id: visit.id,
     done_visit_id: null,
     status: "open",
+    type: "text",
     intervenant_id: intervenant.id,
     photo_ids: [],
     observations: [
@@ -79,6 +80,7 @@ export async function seedIfEmpty() {
     opened_visit_id: null,
     done_visit_id: null,
     status: "open",
+    type: "text",
     intervenant_id: null,
     photo_ids: [],
     observations: ["Check stair railing height"],

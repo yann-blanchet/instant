@@ -2,16 +2,7 @@
   <div class="notes-row notes-task-row">
     <div class="notes-task-header">
       <div class="notes-row-meta">
-        <span class="notes-task-version">{{ taskVersion }}</span>
-        <span>{{ formatRelativeTime(task.updated_at) }}</span>
-        <div v-if="showAssigneeMeta && task.intervenant_id" class="notes-task-category-badges">
-          <CategoryBadge
-            v-for="category in getIntervenantCategories(getTaskAssignee(task))"
-            :key="category.id"
-            :category="category"
-            variant="header"
-          />
-        </div>
+        <span v-if="!isCurrentVisit" class="notes-task-version">{{ taskVersion }}</span>
       </div>
       <div v-if="!readOnly" class="notes-task-header-actions">
         <!-- Desktop: Show individual buttons -->
@@ -52,47 +43,30 @@
             ✕
           </button>
         </div>
-        <!-- Mobile: Show 3-dots menu -->
-        <button
-          class="notes-task-menu"
-          type="button"
-          @click.stop.prevent="$emit('task-menu-click', task)"
-          aria-label="Task actions"
-        >
-          ⋯
-        </button>
+        <!-- Mobile: Show assign button if not assigned, then 3-dots menu -->
+        <div class="notes-task-header-actions-mobile">
+          <button
+            v-if="!task.intervenant_id"
+            class="notes-task-assign-mobile"
+            type="button"
+            @click.stop="$emit('assign-intervenant', task)"
+            aria-label="Assign intervenant"
+          >
+            Assign
+          </button>
+          <button
+            class="notes-task-menu"
+            type="button"
+            @click.stop.prevent="$emit('task-menu-click', task)"
+            aria-label="Task actions"
+          >
+            ⋯
+          </button>
+        </div>
       </div>
     </div>
-    <div v-if="task.status === 'open' && !readOnly" class="notes-task-secondary-row">
-      <button
-        class="notes-task-secondary-action"
-        type="button"
-        @click.stop="$emit('add-text', task)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-        <span>Add note</span>
-      </button>
-      <button
-        class="notes-task-secondary-action"
-        type="button"
-        @click.stop="$emit('add-photo', task)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-          <polyline points="21 15 16 10 5 21"></polyline>
-        </svg>
-        <span>Add photo</span>
-      </button>
-    </div>
     <div class="notes-row-text">
-      <div class="notes-section">
+      <div v-if="task.type !== 'photo'" class="notes-section">
         <div
           v-if="taskContentMap[task.id]?.observations?.length"
           class="notes-observations"
@@ -109,7 +83,7 @@
         </div>
       </div>
 
-      <div class="notes-section">
+      <div v-if="task.type !== 'text'" class="notes-section">
         <div v-if="taskContentMap[task.id]?.photos?.length" class="notes-photo-grid">
           <img
             v-for="(url, index) in taskContentMap[task.id].photos"
@@ -118,10 +92,11 @@
             :class="{ 'notes-content-image-clickable': !readOnly }"
             :src="url"
             alt="Task photo"
-            @click.stop="!readOnly && $emit('edit-photo', { task, photoIndex: index })"
+            @click.stop="!readOnly && $emit('manage-photos', task)"
           />
         </div>
       </div>
+      <div class="notes-task-date">{{ formatRelativeTime(task.updated_at) }}</div>
     </div>
   </div>
 </template>
@@ -157,6 +132,7 @@ const emit = defineEmits<{
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
+  "manage-photos": [task: Task];
   "manage-observations": [task: Task];
   "assign-intervenant": [task: Task];
   "mark-as-done": [task: Task];
@@ -182,6 +158,13 @@ const taskVersion = computed(() => {
   if (!visit?.visit_number) return "v1";
   return `v${formatVisitNumber(visit.visit_number)}`;
 });
+
+const isCurrentVisit = computed(() => {
+  const visitId = props.task.opened_visit_id || props.task.visit_id;
+  if (!visitId) return false;
+  const visit = props.visits.find((v) => v.id === visitId);
+  return visit?.ended_at === null || visit?.ended_at === undefined;
+});
 </script>
 
 <style scoped>
@@ -200,7 +183,7 @@ const taskVersion = computed(() => {
 .notes-task-row {
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  gap: 2px;
   min-height: 60px;
 }
 
@@ -227,10 +210,11 @@ const taskVersion = computed(() => {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  position: relative;
 }
 
 .notes-row-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--notes-text);
 }
 
@@ -248,6 +232,14 @@ const taskVersion = computed(() => {
   color: var(--notes-text);
   font-weight: 600;
   opacity: 1;
+}
+
+.notes-task-date {
+  font-size: 11px;
+  color: var(--notes-muted);
+  align-self: flex-end;
+  margin-top: auto;
+  padding-top: 4px;
 }
 
 
@@ -280,6 +272,12 @@ const taskVersion = computed(() => {
   gap: 16px;
 }
 
+.notes-task-header-actions-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .notes-task-menu {
   display: block;
   background: transparent;
@@ -298,12 +296,30 @@ const taskVersion = computed(() => {
   color: var(--notes-text);
 }
 
+.notes-task-assign-mobile {
+  background: transparent;
+  border: 1px solid var(--notes-border);
+  color: var(--notes-text);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+}
+
+.notes-task-assign-mobile:hover {
+  background: var(--notes-hover);
+  border-color: var(--notes-accent);
+}
+
 @media (min-width: 768px) {
   .notes-task-header-actions-desktop {
     display: flex;
   }
   
-  .notes-task-menu {
+  .notes-task-header-actions-mobile {
     display: none;
   }
 }
@@ -444,7 +460,8 @@ const taskVersion = computed(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 6px;
-  margin-top: 6px;
+  margin: 0;
+  padding: 0;
 }
 
 .notes-content-image {
@@ -459,7 +476,8 @@ const taskVersion = computed(() => {
 }
 
 .notes-section {
-  margin-bottom: 12px;
+  margin: 0;
+  padding: 0;
 }
 
 .notes-section:last-child {

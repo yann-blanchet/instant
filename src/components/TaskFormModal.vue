@@ -90,6 +90,7 @@ const save = async () => {
     opened_visit_id: null,
     done_visit_id: null,
     status: form.status,
+    type: photoId ? "photo" : "text",
     intervenant_id: form.intervenant_id,
     photo_ids: photoId ? [photoId] : [],
     observations: [],

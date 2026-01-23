@@ -25,7 +25,7 @@
           type="button"
           @click="filterMode = 'date'"
         >
-          Non assignée <span class="notes-count-badge">{{ unassignedTasksCount }}</span>
+          Non assignée
         </button>
         <button
           class="notes-filter-badge"
@@ -93,6 +93,7 @@
           @add-text="$emit('add-text', $event)"
           @add-photo="$emit('add-photo', $event)"
           @edit-photo="$emit('edit-photo', $event)"
+          @manage-photos="$emit('manage-photos', $event)"
         @manage-observations="$emit('manage-observations', $event)"
         @assign-intervenant="$emit('assign-intervenant', $event)"
         @task-menu-click="$emit('task-menu-click', $event)"
@@ -133,6 +134,7 @@ const emit = defineEmits<{
   "add-text": [task: Task];
   "add-photo": [task: Task];
   "edit-photo": [payload: { task: Task; photoIndex: number }];
+  "manage-photos": [task: Task];
   "manage-observations": [task: Task];
   "assign-intervenant": [task: Task];
   "mark-as-done": [task: Task];
