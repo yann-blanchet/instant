@@ -45,47 +45,6 @@
           </div>
         </button>
         <button
-          v-else
-          class="notes-sheet-row"
-          type="button"
-          :class="{ active: false }"
-          @click="handleAssignMe"
-        >
-          <div class="notes-sheet-row-content">
-            <div class="notes-sheet-row-name">Me</div>
-          </div>
-        </button>
-        <button
-          v-if="generaleIntervenant"
-          class="notes-sheet-row"
-          type="button"
-          :class="{ active: currentIntervenantId === generaleIntervenant.id }"
-          @click="handleAssign(generaleIntervenant.id)"
-        >
-          <div class="notes-sheet-row-content">
-            <div class="notes-sheet-row-name">{{ generaleIntervenant.name }}</div>
-            <div v-if="getIntervenantCategories(generaleIntervenant).length > 0" class="notes-sheet-row-badges">
-              <CategoryBadge
-                v-for="category in getIntervenantCategories(generaleIntervenant)"
-                :key="category.id"
-                :category="category"
-                variant="header"
-              />
-            </div>
-          </div>
-        </button>
-        <button
-          v-else
-          class="notes-sheet-row"
-          type="button"
-          :class="{ active: false }"
-          @click="handleAssignGenerale"
-        >
-          <div class="notes-sheet-row-content">
-            <div class="notes-sheet-row-name">Générale</div>
-          </div>
-        </button>
-        <button
           v-for="intervenant in otherIntervenants"
           :key="intervenant.id"
           class="notes-sheet-row"
