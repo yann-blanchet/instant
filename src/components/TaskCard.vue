@@ -1,5 +1,9 @@
 <template>
-  <div class="notes-row notes-task-row">
+  <div 
+    class="notes-row notes-task-row"
+    :class="{ 'notes-task-row-clickable': !readOnly }"
+    @click="handleTaskClick"
+  >
     <div class="notes-task-header">
       <div class="notes-row-meta">
         <span v-if="!isCurrentVisit" class="notes-task-version">{{ taskVersion }}</span>
@@ -174,6 +178,23 @@ const isCurrentVisit = computed(() => {
   const visit = props.visits.find((v) => v.id === visitId);
   return visit?.ended_at === null || visit?.ended_at === undefined;
 });
+
+const handleTaskClick = (event: MouseEvent) => {
+  if (props.readOnly) return;
+  
+  // Don't trigger if clicking on buttons or interactive elements
+  const target = event.target as HTMLElement;
+  if (target.closest('button') || target.closest('.notes-task-header-actions')) {
+    return;
+  }
+  
+  // Open appropriate sheet based on task type
+  if (props.task.type === 'text') {
+    emit('manage-observations', props.task);
+  } else if (props.task.type === 'photo') {
+    emit('manage-photos', props.task);
+  }
+};
 </script>
 
 <style scoped>
@@ -194,6 +215,15 @@ const isCurrentVisit = computed(() => {
   align-items: stretch;
   gap: 2px;
   min-height: 60px;
+}
+
+.notes-task-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.notes-task-row-clickable:hover {
+  background: var(--notes-hover);
 }
 
 .notes-task-header {
