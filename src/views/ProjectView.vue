@@ -236,46 +236,14 @@
       @save="saveEditProject"
     />
 
-    <div
-      v-if="isProjectIntervenantsSheetOpen"
-      class="notes-sheet-backdrop"
-      @click="closeProjectIntervenants"
-    >
-      <div class="notes-sheet" @click.stop>
-        <div class="notes-sheet-title">Project intervenants</div>
-        <div class="notes-list notes-form">
-          <div class="notes-field">
-            <span class="notes-label">Intervenants</span>
-            <div class="notes-category-badges">
-              <button
-                v-for="intervenant in intervenants"
-                :key="intervenant.id"
-                class="notes-category-badge"
-                :class="{
-                  active: projectIntervenantIds.includes(intervenant.id),
-                }"
-                type="button"
-                @click="toggleProjectIntervenant(intervenant.id)"
-              >
-                {{ intervenant.name }}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="notes-sheet-actions">
-          <button class="notes-button" type="button" @click="closeProjectIntervenants">
-            Cancel
-          </button>
-          <button
-            class="notes-button notes-button-primary"
-            type="button"
-            @click="saveProjectIntervenants"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
+    <ProjectIntervenantsSheet
+      :is-open="isProjectIntervenantsSheetOpen"
+      :intervenants="intervenants"
+      :selected-ids="projectIntervenantIds"
+      :categories="categories"
+      @close="closeProjectIntervenants"
+      @save="saveProjectIntervenants"
+    />
 
     <div
       v-if="isAssignSheetOpen"
@@ -375,6 +343,7 @@ import PhotosSheet from "../components/PhotosSheet.vue";
 import PhotoEditorModal from "../components/PhotoEditorModal.vue";
 import ProjectFormSheet from "../components/ProjectFormSheet.vue";
 import ProjectObservationsList from "../components/ProjectObservationsList.vue";
+import ProjectIntervenantsSheet from "../components/ProjectIntervenantsSheet.vue";
 import TextSheet from "../components/TextSheet.vue";
 import type { Category, Intervenant, Task, TaskPhoto } from "../db/types";
 import { formatDate, formatRelativeTime, formatVisitNumber } from "../utils/format";
@@ -718,22 +687,12 @@ const openProjectIntervenants = () => {
 
 const closeProjectIntervenants = () => {
   isProjectIntervenantsSheetOpen.value = false;
-  projectIntervenantIds.value = [];
 };
 
-const toggleProjectIntervenant = (intervenantId: string) => {
-  const index = projectIntervenantIds.value.indexOf(intervenantId);
-  if (index >= 0) {
-    projectIntervenantIds.value.splice(index, 1);
-  } else {
-    projectIntervenantIds.value.push(intervenantId);
-  }
-};
-
-const saveProjectIntervenants = async () => {
+const saveProjectIntervenants = async (ids: string[]) => {
   if (!project.value) return;
   await db.projects.update(project.value.id, {
-    intervenant_ids: [...projectIntervenantIds.value],
+    intervenant_ids: Array.isArray(ids) ? [...ids] : [],
     updated_at: nowIso(),
   });
   closeProjectIntervenants();
