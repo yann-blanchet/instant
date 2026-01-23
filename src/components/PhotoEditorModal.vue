@@ -109,9 +109,6 @@
       </div>
 
       <div class="photo-editor-bottom-bar">
-        <button class="photo-editor-bottom-delete" type="button" @click="emitDelete">
-          Delete
-        </button>
         <button class="photo-editor-bottom-cancel" type="button" @click="emitClose">
           Cancel
         </button>
@@ -648,7 +645,6 @@ onBeforeUnmount(() => {
   justify-content: space-between;
 }
 
-.photo-editor-bottom-delete,
 .photo-editor-bottom-cancel,
 .photo-editor-bottom-save {
   flex: 1;
@@ -656,12 +652,6 @@ onBeforeUnmount(() => {
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
-}
-
-.photo-editor-bottom-delete {
-  border: 1px solid #ff3b30;
-  background: transparent;
-  color: #ff3b30;
 }
 
 .photo-editor-bottom-cancel {
