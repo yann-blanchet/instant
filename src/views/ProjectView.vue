@@ -27,7 +27,6 @@
           </div>
         </div>
         <div class="notes-row-right">
-          <span class="notes-tag">En cours</span>
           <button
             class="notes-end-visit-button"
             type="button"

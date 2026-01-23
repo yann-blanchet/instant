@@ -1,7 +1,7 @@
 <template>
   <div>
+    <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Observations') }}</div>
     <div class="notes-section-header">
-      <div class="notes-section-label">{{ title || (status === 'done' ? 'Done observations' : 'Observations') }}</div>
       <div class="notes-filter-badges">
         <button
           class="notes-filter-badge"
@@ -9,15 +9,7 @@
           type="button"
           @click="filterMode = 'open'"
         >
-          Open
-        </button>
-        <button
-          class="notes-filter-badge"
-          :class="{ active: filterMode === 'me' }"
-          type="button"
-          @click="filterMode = 'me'"
-        >
-          assigned to me
+          Open <span class="notes-badge-count">{{ openTasksCount }}</span>
         </button>
         <button
           class="notes-filter-badge"
@@ -25,7 +17,23 @@
           type="button"
           @click="filterMode = 'date'"
         >
-          Non assignée
+          Non assignée <span class="notes-badge-count">{{ nonAssignedTasksCount }}</span>
+        </button>
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'assigned' }"
+          type="button"
+          @click="filterMode = 'assigned'"
+        >
+          Assignée <span class="notes-badge-count">{{ assignedTasksCount }}</span>
+        </button>
+        <button
+          class="notes-filter-badge"
+          :class="{ active: filterMode === 'done' }"
+          type="button"
+          @click="filterMode = 'done'"
+        >
+          Done <span class="notes-badge-count">{{ doneTasksCount }}</span>
         </button>
         <button
           class="notes-filter-badge"
@@ -33,7 +41,7 @@
           type="button"
           @click="filterMode = 'summary'"
         >
-          Summary
+          Summary <span class="notes-badge-count">{{ summaryTasksCount }}</span>
         </button>
       </div>
     </div>
@@ -85,8 +93,8 @@
           :intervenants="intervenants"
           :categories="categories"
           :visits="visits"
-          :show-category-badges="filterMode === 'date'"
-          :show-assignee-meta="filterMode === 'open' || filterMode === 'me'"
+          :show-category-badges="filterMode === 'date' || filterMode === 'assigned'"
+          :show-assignee-meta="filterMode === 'open' || filterMode === 'assigned'"
           :show-unassigned-badge="filterMode === 'open'"
           @task-click="$emit('task-click', $event)"
           @image-click="$emit('image-click', $event)"
@@ -139,10 +147,10 @@ const emit = defineEmits<{
   "assign-intervenant": [task: Task];
   "mark-as-done": [task: Task];
   "delete-task": [task: Task];
-  "filter-mode-change": [mode: "open" | "me" | "date" | "summary"];
+  "filter-mode-change": [mode: "open" | "done" | "assigned" | "date" | "summary"];
 }>();
 
-const filterMode = ref<"open" | "me" | "date" | "summary">("open");
+const filterMode = ref<"open" | "done" | "assigned" | "date" | "summary">("open");
 
 watch(filterMode, (newMode) => {
   emit("filter-mode-change", newMode);
@@ -184,31 +192,54 @@ const unassignedTasksCount = computed(() => {
   return filteredTasks.value.filter((task) => !task.intervenant_id).length;
 });
 
+const openTasksCount = computed(() => {
+  return props.tasks.filter((task) => task.status === "open").length;
+});
+
+const doneTasksCount = computed(() => {
+  return props.tasks.filter((task) => task.status === "done").length;
+});
+
+const assignedTasksCount = computed(() => {
+  return filteredTasks.value.filter((task) => task.intervenant_id != null).length;
+});
+
+const nonAssignedTasksCount = computed(() => {
+  return filteredTasks.value.filter((task) => !task.intervenant_id).length;
+});
+
+const summaryTasksCount = computed(() => {
+  return filteredTasks.value.length;
+});
+
 const meIntervenant = computed(() => {
   return props.intervenants.find((i) => i.name.toLowerCase() === "me");
 });
 
 const sortedTasks = computed(() => {
-  let tasks = [...filteredTasks.value];
+  let tasks: Task[] = [];
   
   // Apply filtering based on filter mode
-  if (filterMode.value === "date") {
-    // In date filter mode, only show not assigned tasks
-    tasks = tasks.filter((task) => !task.intervenant_id);
-  } else if (filterMode.value === "me") {
-    // In me filter mode, only show tasks assigned to "Me" intervenant
-    if (meIntervenant.value) {
-      tasks = tasks.filter((task) => task.intervenant_id === meIntervenant.value?.id);
-    } else {
-      // If "Me" intervenant doesn't exist, show no tasks
-      tasks = [];
+  if (filterMode.value === "done") {
+    // In done filter mode, show all done tasks
+    tasks = props.tasks.filter((task) => task.status === "done");
+  } else {
+    // For other modes, start with the status-filtered tasks
+    tasks = [...filteredTasks.value];
+    
+    if (filterMode.value === "assigned") {
+      // In assigned filter mode, only show assigned tasks
+      tasks = tasks.filter((task) => task.intervenant_id != null);
+    } else if (filterMode.value === "date") {
+      // In date filter mode, only show not assigned tasks
+      tasks = tasks.filter((task) => !task.intervenant_id);
+    } else if (filterMode.value === "summary") {
+      // In summary mode, show all tasks (will be grouped by intervenant)
+      // No filtering needed
     }
-  } else if (filterMode.value === "summary") {
-    // In summary mode, show all tasks (will be grouped by intervenant)
-    // No filtering needed
+    // In open filter mode, show all open tasks (both assigned and not assigned)
+    // No filtering needed - show everything
   }
-  // In open filter mode, show all open tasks (both assigned and not assigned)
-  // No filtering needed - show everything
   
   // By date (descending - newest first, oldest last)
   return tasks.sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -265,14 +296,6 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
 </script>
 
 <style>
-.notes-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
 .notes-section-label {
   font-size: 14px;
   text-transform: uppercase;
@@ -281,6 +304,14 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding-bottom: 8px;
+}
+
+.notes-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
 .notes-count-badge {
@@ -294,7 +325,7 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
 
 .notes-filter-badges {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
@@ -303,11 +334,22 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   background: transparent;
   color: var(--notes-muted);
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.notes-badge-count {
+  display: inline-block;
+  background: var(--notes-panel-strong);
+  color: var(--notes-text);
+  border-radius: 999px;
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 3px;
 }
 
 .notes-filter-badge:hover {
