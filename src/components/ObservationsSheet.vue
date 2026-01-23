@@ -50,7 +50,7 @@
           type="button"
           @click="handleAdd"
         >
-          + Ajouter
+          +
         </button>
       </div>
     </div>
@@ -281,8 +281,9 @@ const handleAdd = () => {
 }
 
 .notes-button-primary {
-  background: var(--notes-accent);
-  color: var(--notes-accent-contrast);
+  background: transparent;
+  border: 2px solid var(--notes-accent);
+  color: var(--notes-accent);
   font-weight: 600;
 }
 </style>
