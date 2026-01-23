@@ -94,7 +94,6 @@
     <div
       v-if="isTaskActionsSheetOpen"
       class="notes-sheet-backdrop"
-      :class="{ 'notes-sheet-backdrop-overlay': isDoneObservationsSheetOpen }"
       @click="closeTaskActionsSheet"
     >
       <div class="notes-sheet" @click.stop>
@@ -215,12 +214,6 @@
         <button class="notes-sheet-row" type="button" @click="openProjectIntervenants">
           Intervenants
         </button>
-        <button class="notes-sheet-row" type="button" @click="openDoneObservations">
-          View done observations
-        </button>
-        <button class="notes-sheet-row" type="button" @click="handleExportReport">
-          Export report (PDF)
-        </button>
         <button class="notes-sheet-row" type="button" @click="showPastVisits">
           View past visits
         </button>
@@ -319,37 +312,6 @@
       </div>
     </div>
 
-    <div
-      v-if="isDoneObservationsSheetOpen"
-      class="notes-sheet-backdrop notes-sheet-backdrop-fullscreen"
-      @click="closeDoneObservations"
-    >
-      <div class="notes-sheet notes-sheet-fullscreen" @click.stop>
-        <div class="notes-sheet-title">Done observations</div>
-        <ProjectObservationsList
-          :project-id="props.id"
-          :tasks="tasks"
-          :task-photos="taskPhotos"
-          :visits="visits"
-          :intervenants="intervenants"
-          :categories="categories"
-          :task-content-map="taskContentMap"
-          status="done"
-          title="Done observations"
-          :in-sheet="true"
-          @task-click="openTask"
-          @image-click="openImageModal"
-          @add-text="handleAddTextToTask"
-          @add-photo="handleAddPhotoToTask"
-        />
-        <div class="notes-sheet-actions">
-          <button class="notes-button" type="button" @click="closeDoneObservations">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-
     <TextSheet
       v-model="isTextSheetOpen"
       :initial-text="editingObservationText"
@@ -424,7 +386,6 @@ const router = useRouter();
 const isActionsSheetOpen = ref(false);
 const isEditProjectSheetOpen = ref(false);
 const isProjectIntervenantsSheetOpen = ref(false);
-const isDoneObservationsSheetOpen = ref(false);
 const isAssignSheetOpen = ref(false);
 const assigningTask = ref<Task | null>(null);
 const isTaskActionsSheetOpen = ref(false);
@@ -725,11 +686,6 @@ const exportProjectPdf = () => {
   exportPdf(project.value.name, content);
 };
 
-const handleExportReport = () => {
-  isActionsSheetOpen.value = false;
-  exportProjectPdf();
-};
-
 const showPastVisits = () => {
   isActionsSheetOpen.value = false;
   router.push(`/projects/${props.id}/visits`);
@@ -781,15 +737,6 @@ const saveProjectIntervenants = async () => {
     updated_at: nowIso(),
   });
   closeProjectIntervenants();
-};
-
-const openDoneObservations = () => {
-  isActionsSheetOpen.value = false;
-  isDoneObservationsSheetOpen.value = true;
-};
-
-const closeDoneObservations = () => {
-  isDoneObservationsSheetOpen.value = false;
 };
 
 const startVisit = async () => {
