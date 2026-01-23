@@ -30,12 +30,10 @@
           </div>
           <div class="notes-row-subtitle">
             {{ visit.date }}
-            <span v-if="visit.id === ongoingVisit?.id">· En cours</span>
           </div>
           </div>
         </div>
         <div class="notes-row-right">
-          <span v-if="visit.id === ongoingVisit?.id" class="notes-tag">En cours</span>
           <span class="notes-chevron">›</span>
         </div>
       </router-link>

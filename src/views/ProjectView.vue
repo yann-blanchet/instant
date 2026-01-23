@@ -32,7 +32,7 @@
             type="button"
             @click.stop="router.push(`/visits/${ongoingVisit.id}`)"
           >
-            Terminer la visite
+            Clore
           </button>
         </div>
       </div>

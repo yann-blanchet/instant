@@ -11,17 +11,6 @@
         </div>
       </div>
       <div class="notes-header-actions">
-        <button class="notes-action" type="button" @click="exportVisitPdf">
-          PDF
-        </button>
-        <button
-          class="notes-action"
-          type="button"
-          @click="endVisit"
-          :disabled="!!visit?.ended_at"
-        >
-          End Visit
-        </button>
       </div>
     </header>
 
@@ -77,8 +66,11 @@
       <button class="notes-bottom-cancel" type="button" @click="handleBack">
         Cancel
       </button>
-      <button class="notes-bottom-save" type="button" @click="save">
-        Save
+      <button class="notes-bottom-action" type="button" @click="exportVisitPdf">
+        PDF
+      </button>
+      <button class="notes-bottom-save" type="button" @click="handleTerminerVisit">
+        Clore
       </button>
     </div>
   </section>
@@ -202,11 +194,12 @@ watch(
   { immediate: true },
 );
 
-const save = async () => {
+const handleTerminerVisit = async () => {
   if (!visit.value) return;
   await db.visits.update(visit.value.id, {
     date: draft.date,
     conclusion: draft.conclusion,
+    ended_at: nowIso(),
     updated_at: nowIso(),
   });
   handleBack();
@@ -214,14 +207,6 @@ const save = async () => {
 
 const handleBack = () => {
   router.back();
-};
-
-const endVisit = async () => {
-  if (!visit.value || visit.value.ended_at) return;
-  await db.visits.update(visit.value.id, {
-    ended_at: nowIso(),
-    updated_at: nowIso(),
-  });
 };
 
 
@@ -302,7 +287,8 @@ const exportVisitPdf = async () => {
 }
 
 .notes-bottom-cancel,
-.notes-bottom-save {
+.notes-bottom-save,
+.notes-bottom-action {
   flex: 1;
   border-radius: 999px;
   padding: 10px 16px;
@@ -311,6 +297,12 @@ const exportVisitPdf = async () => {
 }
 
 .notes-bottom-cancel {
+  border: 1px solid var(--notes-border);
+  background: transparent;
+  color: var(--notes-text);
+}
+
+.notes-bottom-action {
   border: 1px solid var(--notes-border);
   background: transparent;
   color: var(--notes-text);
