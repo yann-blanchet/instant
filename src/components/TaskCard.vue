@@ -109,7 +109,12 @@
           />
         </div>
       </div>
-      <div class="notes-task-date">{{ formatRelativeTime(task.updated_at) }}</div>
+      <div class="notes-task-footer">
+        <span v-if="task.intervenant_id" class="notes-task-assignee">{{ assigneeName }}</span>
+        <span class="notes-task-date">
+          <span v-if="task.intervenant_id">- </span>{{ formatRelativeTime(task.updated_at) }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -164,6 +169,11 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   return props.categories.filter((c) => intervenant.category_ids?.includes(c.id));
 };
 
+const assigneeName = computed(() => {
+  const assignee = getTaskAssignee(props.task);
+  return assignee?.name || UNASSIGNED_LABEL;
+});
+
 const taskVersion = computed(() => {
   const visitId = props.task.opened_visit_id || props.task.visit_id;
   if (!visitId) return "v1";
@@ -181,18 +191,12 @@ const isCurrentVisit = computed(() => {
 
 const handleTaskClick = (event: MouseEvent) => {
   if (props.readOnly) return;
-  
-  // Don't trigger if clicking on buttons or interactive elements
   const target = event.target as HTMLElement;
-  if (target.closest('button') || target.closest('.notes-task-header-actions')) {
-    return;
-  }
-  
-  // Open appropriate sheet based on task type
-  if (props.task.type === 'text') {
-    emit('manage-observations', props.task);
-  } else if (props.task.type === 'photo') {
-    emit('manage-photos', props.task);
+  if (target.closest("button") || target.closest(".notes-task-header-actions")) return;
+  if (props.task.type === "text") {
+    emit("manage-observations", props.task);
+  } else if (props.task.type === "photo") {
+    emit("manage-photos", props.task);
   }
 };
 </script>
@@ -273,12 +277,23 @@ const handleTaskClick = (event: MouseEvent) => {
   opacity: 1;
 }
 
-.notes-task-date {
-  font-size: 11px;
-  color: var(--notes-muted);
-  align-self: flex-end;
+.notes-task-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
   margin-top: auto;
   padding-top: 4px;
+  font-size: 11px;
+  color: var(--notes-muted);
+}
+
+.notes-task-date {
+  font-size: 11px;
+}
+
+.notes-task-assignee {
+  font-size: 11px;
 }
 
 
