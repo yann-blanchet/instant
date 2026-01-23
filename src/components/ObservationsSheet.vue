@@ -107,7 +107,7 @@ const handleAdd = () => {
 
 .notes-sheet {
   width: 100%;
-  max-width: none;
+  max-width: 600px;
   background: var(--notes-panel);
   border-radius: 18px;
   padding: 16px;
@@ -118,10 +118,29 @@ const handleAdd = () => {
   max-height: 80vh;
 }
 
+@media (max-width: 768px) {
+  .notes-sheet {
+    max-width: none;
+    max-height: 70vh;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .notes-sheet {
+    max-width: none;
+    max-height: 60vh;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 12px;
+  }
+}
+
 .notes-sheet-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .notes-sheet-title {
@@ -129,6 +148,13 @@ const handleAdd = () => {
   font-weight: 600;
   color: var(--notes-text);
   margin: 0;
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .notes-sheet-title {
+    font-size: 16px;
+  }
 }
 
 .notes-sheet-close {
@@ -173,12 +199,27 @@ const handleAdd = () => {
   border-radius: 12px;
 }
 
+@media (max-width: 480px) {
+  .notes-observation-item {
+    gap: 8px;
+    padding: 10px;
+    border-radius: 8px;
+  }
+}
+
 .notes-observation-content {
   flex: 1;
   color: var(--notes-text);
   font-size: 14px;
   line-height: 1.5;
   word-wrap: break-word;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .notes-observation-content {
+    font-size: 13px;
+  }
 }
 
 .notes-observation-actions {
@@ -210,6 +251,14 @@ const handleAdd = () => {
   justify-content: flex-end;
   padding-top: 8px;
   border-top: 1px solid var(--notes-border);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .notes-sheet-actions {
+    gap: 8px;
+    padding-top: 6px;
+  }
 }
 
 .notes-button {
@@ -221,6 +270,14 @@ const handleAdd = () => {
   font-size: 14px;
   cursor: pointer;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .notes-button {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
 }
 
 .notes-button-primary {
