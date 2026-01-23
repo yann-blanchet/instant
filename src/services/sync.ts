@@ -128,7 +128,7 @@ async function uploadPhotoToStorage(
       .from('task-photos')
       .upload(filePath, imageBlob, {
         cacheControl: '3600',
-        upsert: false
+        upsert: true
       });
     
     if (uploadError) {

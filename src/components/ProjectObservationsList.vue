@@ -322,6 +322,16 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
   border-color: var(--notes-accent);
 }
 
+.notes-filter-badge:last-child {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .notes-filter-badge:last-child {
+    display: block;
+  }
+}
+
 .notes-list {
   background: var(--notes-panel);
   border-radius: 16px;
