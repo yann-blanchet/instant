@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS visits (
   conclusion TEXT,
   visit_number INTEGER,
   ended_at TIMESTAMPTZ,
+  pdf_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMPTZ

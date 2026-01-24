@@ -281,3 +281,44 @@ export const exportPdf = (
   win.focus();
   win.print();
 };
+
+/**
+ * Generate PDF HTML as a string that can be converted to a file
+ */
+export const generatePdfHtml = (
+  title: string,
+  content: string,
+  css: string = PDF_CSS
+): string => {
+  const fullCss = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: 24px; 
+      color: #111; 
+      background: white; 
+      line-height: 1.5;
+    }
+    ${css}
+    @media print {
+      body { padding: 0; }
+      .pdf-header { page-break-after: avoid; }
+      .pdf-assignee-group { page-break-inside: avoid; }
+      .pdf-task { page-break-inside: avoid; }
+    }
+  `;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${title}</title>
+        <style>${fullCss}</style>
+      </head>
+      <body>
+        ${content}
+      </body>
+    </html>
+  `;
+};

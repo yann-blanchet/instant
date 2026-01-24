@@ -69,7 +69,7 @@
       <button class="notes-bottom-action" type="button" @click="exportVisitPdf">
         PDF
       </button>
-      <button class="notes-bottom-save" type="button" @click="handleTerminerVisit">
+      <button class="notes-bottom-save" type="button" @click="handleTerminerVisit()">
         Clore
       </button>
     </div>
@@ -85,7 +85,8 @@ import type { Category, Intervenant, Task, TaskPhoto } from "../db/types";
 import { formatVisitNumber } from "../utils/format";
 import { nowIso } from "../utils/time";
 import VisitPdfPreview from "../components/VisitPdfPreview.vue";
-import { generatePdfContent, exportPdf, PDF_CSS } from "../utils/pdfGenerator";
+import { generatePdfContent, exportPdf, generatePdfHtml, PDF_CSS } from "../utils/pdfGenerator";
+import { supabase } from "../supabase";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -195,13 +196,93 @@ watch(
 );
 
 const handleTerminerVisit = async () => {
-  if (!visit.value) return;
+  console.log("=== CLORE BUTTON CLICKED ===");
+  console.log("Visit exists:", !!visit.value);
+  
+  if (!visit.value) {
+    console.log("Early return: missing visit");
+    return;
+  }
+  
+  // Fetch project directly to ensure it's loaded
+  const currentProject = await db.projects.get(visit.value.project_id);
+  console.log("Project loaded:", !!currentProject);
+  
+  if (!currentProject) {
+    console.log("Early return: project not found");
+    return;
+  }
+  
+  console.log("=== Starting visit finalization ===");
+  console.log("Visit ID:", visit.value.id);
+  console.log("Project ID:", currentProject.id);
+  console.log("Supabase configured:", !!supabase);
+  
+  // Generate PDF
+  const title = `Visite ${formatVisitNumber(visit.value.visit_number ?? 0)}`;
+  console.log("Generating PDF content...");
+  
+  const content = generatePdfContent({
+    projectName: currentProject.name,
+    tasks: openTasks.value,
+    taskContentMap: taskContentMap.value,
+    intervenants: intervenants.value,
+    categories: categories.value,
+    visitNumber: visit.value.visit_number,
+    visitDate: draft.date,
+    conclusion: draft.conclusion,
+  });
+  
+  console.log("Generating PDF HTML...");
+  const htmlContent = generatePdfHtml(title, content);
+  const blob = new Blob([htmlContent], { type: "text/html" });
+  console.log("PDF blob created, size:", blob.size, "bytes");
+  
+  let pdfUrl: string | null = null;
+  
+  // Upload to Supabase if available
+  if (supabase) {
+    try {
+      const filePath = `project_${currentProject.id}/visit_${visit.value.id}.pdf`;
+      
+      console.log("Uploading PDF to:", filePath);
+      
+      // Upload the HTML file (which can be opened and printed as PDF)
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("visit-pdfs")
+        .upload(filePath, blob, {
+          contentType: "text/html",
+          upsert: true,
+        });
+      
+      if (uploadError) {
+        console.error("Error uploading PDF:", uploadError);
+      } else {
+        console.log("PDF uploaded successfully:", uploadData);
+        // Get public URL
+        const { data } = supabase.storage
+          .from("visit-pdfs")
+          .getPublicUrl(filePath);
+        
+        pdfUrl = data.publicUrl;
+        console.log("PDF public URL:", pdfUrl);
+      }
+    } catch (error) {
+      console.error("Error uploading PDF to Supabase:", error);
+    }
+  } else {
+    console.warn("Supabase not configured, PDF will not be uploaded");
+  }
+  
+  // Update visit with pdf_url
   await db.visits.update(visit.value.id, {
     date: draft.date,
     conclusion: draft.conclusion,
     ended_at: nowIso(),
+    pdf_url: pdfUrl,
     updated_at: nowIso(),
   });
+  
   handleBack();
 };
 

@@ -35,6 +35,7 @@ export interface Visit {
   conclusion?: string | null;
   visit_number?: number;
   ended_at?: string | null;
+  pdf_url?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
