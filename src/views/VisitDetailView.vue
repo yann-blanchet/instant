@@ -218,14 +218,45 @@ const handleTerminerVisit = async () => {
   console.log("Project ID:", currentProject.id);
   console.log("Supabase configured:", !!supabase);
   
+  // Convert image URLs to base64 for embedding in PDF
+  console.log("Converting images to base64...");
+  const taskContentMapWithBase64: Record<string, { observations: string[]; photos: string[] }> = {};
+  
+  for (const [taskId, content] of Object.entries(taskContentMap.value)) {
+    const base64Photos: string[] = [];
+    
+    for (const photoUrl of content.photos) {
+      try {
+        const response = await fetch(photoUrl);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        base64Photos.push(base64);
+      } catch (error) {
+        console.error("Error converting image to base64:", error);
+        // Keep original URL as fallback
+        base64Photos.push(photoUrl);
+      }
+    }
+    
+    taskContentMapWithBase64[taskId] = {
+      observations: content.observations,
+      photos: base64Photos,
+    };
+  }
+  
+  console.log("Images converted, generating PDF content...");
+  
   // Generate PDF
   const title = `Visite ${formatVisitNumber(visit.value.visit_number ?? 0)}`;
-  console.log("Generating PDF content...");
   
   const content = generatePdfContent({
     projectName: currentProject.name,
     tasks: openTasks.value,
-    taskContentMap: taskContentMap.value,
+    taskContentMap: taskContentMapWithBase64,
     intervenants: intervenants.value,
     categories: categories.value,
     visitNumber: visit.value.visit_number,

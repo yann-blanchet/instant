@@ -16,27 +16,40 @@
       <div v-if="visitList.length === 0" class="notes-row notes-row-empty">
         Aucune visite.
       </div>
-      <router-link
+      <div
         v-for="visit in visitList"
         :key="visit.id"
-        :to="`/visits/${visit.id}`"
         class="notes-row"
       >
-        <div class="notes-row-left">
-          <span class="notes-folder">📁</span>
-          <div class="notes-row-text">
-          <div class="notes-row-title">
-            Visite {{ formatVisitNumber(visit.visit_number) }}
+        <router-link
+          :to="`/visits/${visit.id}`"
+          class="notes-row-link"
+        >
+          <div class="notes-row-left">
+            <span class="notes-folder">📁</span>
+            <div class="notes-row-text">
+            <div class="notes-row-title">
+              Visite {{ formatVisitNumber(visit.visit_number) }}
+            </div>
+            <div class="notes-row-subtitle">
+              {{ visit.date }}
+            </div>
+            </div>
           </div>
-          <div class="notes-row-subtitle">
-            {{ visit.date }}
+          <div class="notes-row-right">
+            <span class="notes-chevron">›</span>
           </div>
-          </div>
-        </div>
-        <div class="notes-row-right">
-          <span class="notes-chevron">›</span>
-        </div>
-      </router-link>
+        </router-link>
+        <button
+          v-if="visit.pdf_url"
+          class="notes-pdf-button"
+          type="button"
+          @click.stop="openPdf(visit.pdf_url)"
+          aria-label="Open PDF"
+        >
+          📄
+        </button>
+      </div>
     </div>
   </section>
 </template>
@@ -71,6 +84,25 @@ const visitList = computed(() => {
     return b.date.localeCompare(a.date);
   });
 });
+
+const openPdf = async (url: string) => {
+  try {
+    // Fetch the HTML content from Supabase
+    const response = await fetch(url);
+    const htmlContent = await response.text();
+    
+    // Open in new window and render
+    const win = window.open("", "_blank");
+    if (!win) return;
+    
+    win.document.write(htmlContent);
+    win.document.close();
+  } catch (error) {
+    console.error("Error opening PDF:", error);
+    // Fallback to direct URL open
+    window.open(url, '_blank');
+  }
+};
 
 </script>
 
@@ -132,19 +164,48 @@ const visitList = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 0;
   color: inherit;
   background: transparent;
   border: none;
   text-align: left;
+  gap: 0;
+}
+
+.notes-row-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
   gap: 16px;
+}
+
+.notes-row-link:hover {
+  background: var(--notes-hover);
 }
 
 .notes-row + .notes-row {
   border-top: 1px solid var(--notes-border);
 }
 
-.notes-row:hover {
+.notes-pdf-button {
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--notes-text);
+  flex-shrink: 0;
+  border-left: 1px solid var(--notes-border);
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.notes-pdf-button:hover {
   background: var(--notes-hover);
 }
 
