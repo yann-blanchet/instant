@@ -71,87 +71,7 @@
 
     <IntervenantsTab v-else-if="activeTab === 'intervenants'" :intervenants="intervenants" :categories="categories" />
 
-    <div v-else-if="activeTab === 'categories'">
-      <div class="notes-section-label">Categories / Lots</div>
-      <div class="notes-list">
-        <div v-if="categories.length === 0" class="notes-row notes-row-empty">
-          No categories yet.
-        </div>
-        <div class="notes-category-grid">
-          <div
-            v-for="category in categories"
-            :key="category.id"
-            class="notes-category-card"
-            @click="openEditCategory(category)"
-          >
-            <div
-              v-if="category.color"
-              class="notes-category-color-indicator"
-              :style="{ background: category.color }"
-            ></div>
-            <div class="notes-category-name">{{ category.name }}</div>
-            <span class="notes-chevron">›</span>
-          </div>
-        </div>
-      </div>
-
-      <button
-        class="notes-fab"
-        type="button"
-        aria-label="Add category"
-        @click="isCategorySheetOpen = true"
-      >
-        +
-      </button>
-
-      <div
-        v-if="isCategorySheetOpen"
-        class="notes-sheet-backdrop"
-        @click="closeCategorySheet"
-      >
-        <div class="notes-sheet" @click.stop>
-          <div class="notes-sheet-title">
-            {{ editingCategoryId ? "Edit category" : "Add category" }}
-          </div>
-          <div class="notes-list notes-form">
-            <label class="notes-field">
-              <span class="notes-label">Name</span>
-              <input
-                v-model="categoryName"
-                class="notes-input"
-                placeholder="Category name"
-              />
-            </label>
-            <div class="notes-field">
-              <span class="notes-label">Color</span>
-              <div class="notes-color-palette">
-                <button
-                  v-for="color in colorPalette"
-                  :key="color"
-                  class="notes-color-circle"
-                  :class="{ active: categoryColor === color }"
-                  type="button"
-                  :style="{ background: color }"
-                  @click="categoryColor = color"
-                />
-              </div>
-            </div>
-          </div>
-          <div class="notes-sheet-actions">
-            <button class="notes-button" type="button" @click="closeCategorySheet">
-              Cancel
-            </button>
-            <button
-              class="notes-button notes-button-primary"
-              type="button"
-              @click="saveCategory"
-            >
-              {{ editingCategoryId ? "Update" : "Add" }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CategoriesTab v-else-if="activeTab === 'categories'" :categories="categories" />
 
     <div v-else>
       <div class="notes-section-label">Backup / Sync</div>
@@ -194,6 +114,7 @@ import { syncNow } from "../services/sync";
 import { cleanupDeletedRecords } from "../services/cleanup";
 import CategoryBadge from "../components/CategoryBadge.vue";
 import IntervenantsTab from "../components/IntervenantsTab.vue";
+import CategoriesTab from "../components/CategoriesTab.vue";
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 const categories = useLiveQuery(() => db.categories.toArray(), []);
@@ -203,33 +124,9 @@ const intervenantEmail = ref("");
 const intervenantPhone = ref("");
 const intervenantCategories = ref<string[]>([]);
 const editingIntervenantId = ref<string | null>(null);
-const colorPalette = [
-  "#000000",
-  "#ffffff",
-  "#ff6b6b",
-  "#4dabf7",
-  "#40c057",
-  "#845ef7",
-  "#f8c44c",
-  "#ff8787",
-  "#51cf66",
-  "#339af0",
-  "#9775fa",
-  "#ffd43b",
-  "#ff922b",
-  "#20c997",
-  "#228be6",
-  "#cc5de8",
-  "#fab005",
-  "#fd7e14",
-  "#12b886",
-  "#1c7ed6",
-];
-const categoryColor = ref(colorPalette[0]);
 const isLight = ref(false);
 const activeTab = ref<"profile" | "intervenants" | "categories" | "sync">("profile");
 const isIntervenantSheetOpen = ref(false);
-const isCategorySheetOpen = ref(false);
 const router = useRouter();
 
 const applyTheme = (theme: "light" | "dark") => {
@@ -245,35 +142,6 @@ onMounted(() => {
 watch(isLight, (value) => {
   applyTheme(value ? "light" : "dark");
 });
-
-const openEditCategory = (category: Category) => {
-  editingCategoryId.value = category.id;
-  categoryName.value = category.name;
-  categoryColor.value = category.color || colorPalette[0];
-  isCategorySheetOpen.value = true;
-};
-
-const saveCategory = async () => {
-  if (!categoryName.value.trim()) return;
-  const timestamp = nowIso();
-  if (editingCategoryId.value) {
-    await db.categories.update(editingCategoryId.value, {
-      name: categoryName.value.trim(),
-      color: categoryColor.value || null,
-      updated_at: timestamp,
-    });
-  } else {
-    await db.categories.add({
-      id: makeId(),
-      name: categoryName.value.trim(),
-      color: categoryColor.value || null,
-      created_at: timestamp,
-      updated_at: timestamp,
-      deleted_at: null,
-    });
-  }
-  closeCategorySheet();
-};
 
 const runSync = async () => {
   try {
@@ -306,13 +174,6 @@ const runCleanup = async () => {
     console.error("Cleanup error:", error);
     alert(`Cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-};
-
-const closeCategorySheet = () => {
-  isCategorySheetOpen.value = false;
-  editingCategoryId.value = null;
-  categoryName.value = "";
-  categoryColor.value = colorPalette[0];
 };
 
 </script>
