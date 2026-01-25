@@ -318,12 +318,13 @@
 
     <IntervenantAssignSheet
       v-model="isIntervenantAssignSheetOpen"
-      :intervenants="projectIntervenantsList"
+      :all-intervenants="intervenants"
+      :project-intervenant-ids="projectIntervenantIds"
       :categories="categories"
       :current-intervenant-id="assigningTaskId?.intervenant_id"
       @close="closeIntervenantAssignSheet"
       @assign="handleAssignIntervenantToTask"
-
+      @add-intervenant-to-project="handleAddIntervenantToProject"
     />
   </section>
 </template>
@@ -1220,6 +1221,17 @@ const handleAssignIntervenantToTask = async (intervenantId: string | null) => {
     updated_at: nowIso(),
   });
   closeIntervenantAssignSheet();
+};
+
+const handleAddIntervenantToProject = async (intervenantId: string) => {
+  if (!project.value) return;
+  const currentIds = project.value.intervenant_ids || [];
+  if (!currentIds.includes(intervenantId)) {
+    await db.projects.update(project.value.id, {
+      intervenant_ids: [...currentIds, intervenantId],
+      updated_at: nowIso(),
+    });
+  }
 };
 
 const updatePhoto = async (photoId: string, newBlob: Blob) => {
