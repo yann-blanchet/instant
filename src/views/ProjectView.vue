@@ -290,6 +290,7 @@
     <PhotoEditorModal
       :is-active="isPhotoEditorOpen"
       :image-field="{ value: photoEditorSource }"
+      :caption="photoEditorCaption"
       :show-save="true"
       @close="closePhotoEditor"
       @update-image="handlePhotoUpdated"
@@ -367,6 +368,7 @@ const imagePickerRef = ref<InstanceType<typeof ImagePicker> | null>(null);
 const editingTaskId = ref<string | null>(null);
 const isPhotoEditorOpen = ref(false);
 const photoEditorSource = ref("");
+const photoEditorCaption = ref("");
 const editingPhotoId = ref<string | null>(null);
 const isObservationsSheetOpen = ref(false);
 const isPhotosSheetOpen = ref(false);
@@ -773,6 +775,7 @@ const handleImageSelected = async (blob: Blob) => {
         url: null,
         storage_path: null,
         image_blob: blob,
+        caption: null,
         created_at: timestamp,
         updated_at: timestamp,
         deleted_at: null,
@@ -824,6 +827,7 @@ const handleImageSelected = async (blob: Blob) => {
       url: null,
       storage_path: null,
       image_blob: blob,
+      caption: null,
       created_at: timestamp,
       updated_at: timestamp,
       deleted_at: null,
@@ -952,6 +956,7 @@ const handleEditPhoto = async (payload: { task: Task; photoIndex: number }) => {
   
   editingPhotoId.value = photoId;
   editingTaskId.value = task.id;
+  photoEditorCaption.value = photo.caption || "";
   
   // Load the photo into the editor
   if (photo.image_blob) {
@@ -971,6 +976,7 @@ const closePhotoEditor = () => {
     URL.revokeObjectURL(photoEditorSource.value);
   }
   photoEditorSource.value = "";
+  photoEditorCaption.value = "";
   isPhotoEditorOpen.value = false;
   editingPhotoId.value = null;
   editingTaskId.value = null;
@@ -981,13 +987,13 @@ const handlePhotoUpdated = async (dataUrl: string) => {
   // The actual save happens in handlePhotoEdited when user clicks "Save"
 };
 
-const handlePhotoEdited = async (dataUrl: string) => {
-  const response = await fetch(dataUrl);
+const handlePhotoEdited = async (payload: { dataUrl: string; caption: string }) => {
+  const response = await fetch(payload.dataUrl);
   const blob = await response.blob();
   
   if (editingPhotoId.value && editingTaskId.value) {
-    // Update existing photo
-    await updatePhoto(editingPhotoId.value, blob);
+    // Update existing photo with caption
+    await updatePhoto(editingPhotoId.value, blob, payload.caption);
   }
   
   closePhotoEditor();
@@ -1085,6 +1091,7 @@ const handleEditPhotoFromSheet = async (index: number) => {
   
   editingPhotoId.value = photoId;
   editingTaskId.value = managingTaskId.value;
+  photoEditorCaption.value = photo.caption || "";
   isPhotosSheetOpen.value = false;
   
   // Load the photo into the editor
@@ -1234,18 +1241,19 @@ const handleAddIntervenantToProject = async (intervenantId: string) => {
   }
 };
 
-const updatePhoto = async (photoId: string, newBlob: Blob) => {
+const updatePhoto = async (photoId: string, newBlob: Blob, caption?: string) => {
   const timestamp = nowIso();
   
   // Get the photo to check if it was already synced
   const photo = await db.task_photos.get(photoId);
   const wasSynced = !!(photo?.storage_path && photo?.url);
   
-  // Update immediately with original blob (fast, no compression delay)
+  // Update immediately with original blob and caption (fast, no compression delay)
   await db.task_photos.update(photoId, {
     image_blob: newBlob, // Store original first - will be compressed in background
     url: null, // Clear URL since we have a new version
     storage_path: null, // Clear storage path since we need to re-upload
+    caption: caption || null, // Update caption
     updated_at: timestamp,
   });
   

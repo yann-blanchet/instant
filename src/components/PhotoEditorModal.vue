@@ -108,6 +108,16 @@
         </div>
       </div>
 
+      <div class="photo-editor-caption">
+        <input
+          v-model="photoCaption"
+          type="text"
+          class="photo-editor-caption-input"
+          placeholder="Ajouter une légende (optionnel)..."
+          maxlength="200"
+        />
+      </div>
+
       <div class="photo-editor-bottom-bar">
         <button class="photo-editor-bottom-cancel" type="button" @click="emitClose">
           Cancel
@@ -135,12 +145,13 @@ const props = defineProps<{
   isActive: boolean;
   imageField: { value: string };
   showSave: boolean;
+  caption?: string;
 }>();
 
 const emit = defineEmits<{
   (event: "close"): void;
   (event: "update-image", payload: string): void;
-  (event: "send-image", payload: string): void;
+  (event: "send-image", payload: { dataUrl: string; caption: string }): void;
   (event: "delete"): void;
 }>();
 
@@ -173,6 +184,7 @@ const texts = ref<
 const selectedTextId = ref<string | null>(null);
 const isTextSheetOpen = ref(false);
 const textDraft = ref("");
+const photoCaption = ref("");
 
 const imageElement = ref<HTMLImageElement | null>(null);
 const imageConfig = computed(() => ({
@@ -399,7 +411,7 @@ const sendImage = () => {
   const stage = stageRef.value?.getStage();
   if (!stage) return;
   const dataUrl = stage.toDataURL({ pixelRatio: 2 });
-  emit("send-image", dataUrl);
+  emit("send-image", { dataUrl, caption: photoCaption.value.trim() });
 };
 
 watch(
@@ -431,6 +443,7 @@ watch(
       texts.value = [];
       selectedTextId.value = null;
       tool.value = "draw";
+      photoCaption.value = props.caption || "";
       // Reload image when modal opens
       if (props.imageField.value) {
         nextTick(() => {
@@ -597,6 +610,7 @@ onBeforeUnmount(() => {
   flex: 1;
   background: #000;
   min-height: 0;
+  max-height: calc(100vh - 180px);
   display: flex;
 }
 
@@ -633,16 +647,40 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.photo-editor-caption {
+  padding: 12px 16px;
+  background: #000;
+  border-top: 1px solid #2c2c2e;
+  flex-shrink: 0;
+}
+
+.photo-editor-caption-input {
+  width: 100%;
+  background: #2c2c2e;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  color: #f3f4f6;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.photo-editor-caption-input::placeholder {
+  color: #8e8e93;
+}
+
+.photo-editor-caption-input:focus {
+  outline: none;
+  border-color: #f8c44c;
+}
+
 .photo-editor-bottom-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background: #000;
   padding: 12px 16px;
   display: flex;
   gap: 12px;
   justify-content: space-between;
+  border-top: 1px solid #2c2c2e;
+  flex-shrink: 0;
 }
 
 .photo-editor-bottom-cancel,

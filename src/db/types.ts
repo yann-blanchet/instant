@@ -47,6 +47,7 @@ export interface TaskPhoto {
   url?: string | null;
   storage_path?: string | null;
   image_blob?: Blob | null;
+  caption?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;

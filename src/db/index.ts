@@ -40,7 +40,7 @@ export class AppDB extends Dexie {
       projects: "id, name, updated_at, deleted_at",
       tasks: "id, project_id, status, updated_at, deleted_at",
       visits: "id, project_id, date, ended_at, updated_at, deleted_at",
-      task_photos: "id, task_id, updated_at, deleted_at",
+      task_photos: "id, task_id, caption, updated_at, deleted_at",
       intervenants: "id, name, updated_at, deleted_at",
       categories: "id, name, updated_at, deleted_at",
     };
