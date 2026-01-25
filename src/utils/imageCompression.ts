@@ -1,9 +1,8 @@
 /**
  * Image compression utilities
  * Compresses images locally before storing/uploading to reduce storage and bandwidth
+ * Uses Canvas API for native compression - no external dependencies
  */
-
-import imageCompression from 'browser-image-compression';
 
 export interface CompressionOptions {
   maxSizeMB?: number;
@@ -17,11 +16,11 @@ const DEFAULT_OPTIONS: CompressionOptions = {
   maxSizeMB: 0.5, // Target 500KB max file size (optimized for cost)
   maxWidthOrHeight: 1920, // Limit to 1920px on longest side (good for most displays)
   initialQuality: 0.80, // 80% quality (good balance - slight reduction for better compression)
-  useWebWorker: true, // Use Web Worker to avoid blocking UI
+  useWebWorker: false, // Canvas API is synchronous, not suitable for web workers
 };
 
 /**
- * Compress an image file
+ * Compress an image using Canvas API
  * @param file - The image file to compress
  * @param options - Compression options (optional)
  * @returns Compressed file as Blob
@@ -37,41 +36,98 @@ export async function compressImage(
   
   // Skip compression if image is already small enough (faster)
   if (originalSizeMB <= opts.maxSizeMB! * 1.1) {
-    // Image is already close to target size, skip compression
     console.log(`[Image Compression] Skipping compression: ${originalSizeMB.toFixed(2)}MB (already under ${opts.maxSizeMB}MB target)`);
     return file instanceof Blob ? file : await file.arrayBuffer().then(b => new Blob([b], { type: file.type || 'image/jpeg' }));
   }
   
   console.log(`[Image Compression] Starting compression: ${originalSizeMB.toFixed(2)}MB`);
   
-  // If it's already a Blob, convert to File for the library
-  const imageFile = file instanceof File 
-    ? file 
-    : new File([file], 'image.jpg', { type: file.type || 'image/jpeg' });
-
   try {
-    const compressedFile = await imageCompression(imageFile, {
-      maxSizeMB: opts.maxSizeMB,
-      maxWidthOrHeight: opts.maxWidthOrHeight,
-      initialQuality: opts.initialQuality,
-      useWebWorker: opts.useWebWorker,
-      fileType: opts.fileType,
-      maxIteration: 5, // Limit iterations for faster compression (default is 10)
+    // Read the image file
+    const imageUrl = URL.createObjectURL(file);
+    const img = new Image();
+    
+    return new Promise((resolve, reject) => {
+      img.onload = () => {
+        try {
+          URL.revokeObjectURL(imageUrl);
+          
+          // Calculate new dimensions
+          let width = img.width;
+          let height = img.height;
+          
+          if (opts.maxWidthOrHeight && (width > opts.maxWidthOrHeight || height > opts.maxWidthOrHeight)) {
+            const ratio = Math.min(opts.maxWidthOrHeight / width, opts.maxWidthOrHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          
+          // Create canvas and draw image
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Could not get canvas context');
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Compress with quality reduction
+          let quality = opts.initialQuality || 0.8;
+          let compressedBlob: Blob | null = null;
+          
+          // Try decreasing quality until we hit the target size
+          const maxIterations = 5;
+          let iteration = 0;
+          
+          const tryCompress = (q: number): Promise<Blob> => {
+            return new Promise((resolveBlob) => {
+              canvas.toBlob(
+                (blob) => {
+                  if (!blob) throw new Error('Canvas to blob failed');
+                  resolveBlob(blob);
+                },
+                'image/jpeg',
+                q
+              );
+            });
+          };
+          
+          // Progressively reduce quality until target size is reached
+          (async () => {
+            while (iteration < maxIterations && quality > 0.1) {
+              compressedBlob = await tryCompress(quality);
+              const compressedSize = compressedBlob.size / 1024 / 1024;
+              
+              if (compressedSize <= opts.maxSizeMB!) {
+                break;
+              }
+              
+              quality -= 0.15; // Reduce quality by 15% each iteration
+              iteration++;
+            }
+            
+            if (!compressedBlob) {
+              throw new Error('Failed to compress image');
+            }
+            
+            const compressedSize = compressedBlob.size;
+            const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(1);
+            console.log(`[Image Compression] Completed: ${(compressedSize / 1024 / 1024).toFixed(2)}MB (${reduction}% reduction)`);
+            
+            resolve(compressedBlob);
+          })();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = imageUrl;
     });
-
-    // The library returns a File, convert to Blob for consistency
-    // File extends Blob, but we want a pure Blob
-    const compressedBlob = compressedFile instanceof File
-      ? new Blob([compressedFile], { type: compressedFile.type })
-      : compressedFile instanceof Blob
-      ? compressedFile
-      : await compressedFile.arrayBuffer().then(b => new Blob([b], { type: compressedFile.type || 'image/jpeg' }));
-    
-    const compressedSize = compressedBlob.size;
-    const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(1);
-    console.log(`[Image Compression] Completed: ${(compressedSize / 1024 / 1024).toFixed(2)}MB (${reduction}% reduction)`);
-    
-    return compressedBlob;
   } catch (error) {
     console.error('[Image Compression] Failed:', error);
     // Return original file if compression fails

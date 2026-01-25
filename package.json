@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
-    "browser-image-compression": "^2.0.2",
     "dexie": "^4.0.11",
     "konva": "^10.2.0",
     "vue": "^3.5.12",
