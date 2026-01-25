@@ -69,113 +69,7 @@
       </div>
     </div>
 
-    <div v-else-if="activeTab === 'intervenants'">
-      <div class="notes-section-label">Intervenants</div>
-      <div class="notes-list">
-        <div v-if="intervenants.length === 0" class="notes-row notes-row-empty">
-          No intervenants yet.
-        </div>
-        <div class="notes-intervenant-grid">
-          <div
-            v-for="person in intervenants"
-            :key="person.id"
-            class="notes-intervenant-card"
-            @click="openEditIntervenant(person)"
-          >
-            <div class="notes-intervenant-left">
-              <div class="notes-intervenant-name">{{ person.name }}</div>
-              <div v-if="person.email || person.phone" class="notes-intervenant-contact">
-                <span v-if="person.email" class="notes-intervenant-email">{{ person.email }}</span>
-                <span v-if="person.phone" class="notes-intervenant-phone">{{ person.phone }}</span>
-              </div>
-              <div v-if="getIntervenantCategoryBadges(person).length > 0" class="notes-intervenant-badges">
-                <CategoryBadge
-                  v-for="category in getIntervenantCategoryBadges(person)"
-                  :key="category.id"
-                  :category="category"
-                  variant="header"
-                />
-              </div>
-            </div>
-            <span class="notes-chevron">›</span>
-          </div>
-        </div>
-      </div>
-
-      <button
-        class="notes-fab"
-        type="button"
-        aria-label="Add intervenant"
-        @click="isIntervenantSheetOpen = true"
-      >
-        +
-      </button>
-
-      <div
-        v-if="isIntervenantSheetOpen"
-        class="notes-sheet-backdrop"
-        @click="closeIntervenantSheet"
-      >
-        <div class="notes-sheet" @click.stop>
-          <div class="notes-sheet-title">
-            {{ editingIntervenantId ? "Edit intervenant" : "Add intervenant" }}
-          </div>
-          <div class="notes-list notes-form">
-            <label class="notes-field">
-              <span class="notes-label">Name</span>
-              <input
-                v-model="intervenantName"
-                class="notes-input"
-                placeholder="Intervenant name"
-              />
-            </label>
-            <label class="notes-field">
-              <span class="notes-label">Email</span>
-              <input
-                v-model="intervenantEmail"
-                type="email"
-                class="notes-input"
-                placeholder="Email address"
-              />
-            </label>
-            <label class="notes-field">
-              <span class="notes-label">Phone</span>
-              <input
-                v-model="intervenantPhone"
-                type="tel"
-                class="notes-input"
-                placeholder="Phone number"
-              />
-            </label>
-            <div class="notes-field">
-              <span class="notes-label">Categories</span>
-              <div class="notes-category-badges">
-                <CategoryBadge
-                  v-for="category in categories"
-                  :key="category.id"
-                  :category="category"
-                  :active="intervenantCategories.includes(category.id)"
-                  clickable
-                  @click="toggleCategory(category.id)"
-                />
-              </div>
-            </div>
-          </div>
-          <div class="notes-sheet-actions">
-            <button class="notes-button" type="button" @click="closeIntervenantSheet">
-              Cancel
-            </button>
-            <button
-              class="notes-button notes-button-primary"
-              type="button"
-              @click="saveIntervenant"
-            >
-              {{ editingIntervenantId ? "Update" : "Add" }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <IntervenantsTab v-else-if="activeTab === 'intervenants'" :intervenants="intervenants" :categories="categories" />
 
     <div v-else-if="activeTab === 'categories'">
       <div class="notes-section-label">Categories / Lots</div>
@@ -299,6 +193,7 @@ import { makeId, nowIso } from "../utils/time";
 import { syncNow } from "../services/sync";
 import { cleanupDeletedRecords } from "../services/cleanup";
 import CategoryBadge from "../components/CategoryBadge.vue";
+import IntervenantsTab from "../components/IntervenantsTab.vue";
 
 const intervenants = useLiveQuery(() => db.intervenants.toArray(), []);
 const categories = useLiveQuery(() => db.categories.toArray(), []);
@@ -308,8 +203,6 @@ const intervenantEmail = ref("");
 const intervenantPhone = ref("");
 const intervenantCategories = ref<string[]>([]);
 const editingIntervenantId = ref<string | null>(null);
-const categoryName = ref("");
-const editingCategoryId = ref<string | null>(null);
 const colorPalette = [
   "#000000",
   "#ffffff",
@@ -352,64 +245,6 @@ onMounted(() => {
 watch(isLight, (value) => {
   applyTheme(value ? "light" : "dark");
 });
-
-const getIntervenantCategoryBadges = (intervenant: Intervenant) => {
-  if (!intervenant.category_ids || intervenant.category_ids.length === 0) return [];
-  return categories.value.filter((c) => intervenant.category_ids?.includes(c.id));
-};
-
-const openEditIntervenant = (intervenant: Intervenant) => {
-  editingIntervenantId.value = intervenant.id;
-  intervenantName.value = intervenant.name;
-  intervenantEmail.value = intervenant.email || "";
-  intervenantPhone.value = intervenant.phone || "";
-  intervenantCategories.value = [...(intervenant.category_ids || [])];
-  isIntervenantSheetOpen.value = true;
-};
-
-const saveIntervenant = async () => {
-  if (!intervenantName.value.trim()) return;
-  const timestamp = nowIso();
-  if (editingIntervenantId.value) {
-    await db.intervenants.update(editingIntervenantId.value, {
-      name: intervenantName.value.trim(),
-      email: intervenantEmail.value.trim() || null,
-      phone: intervenantPhone.value.trim() || null,
-      category_ids: [...intervenantCategories.value],
-      updated_at: timestamp,
-    });
-  } else {
-    await db.intervenants.add({
-      id: makeId(),
-      name: intervenantName.value.trim(),
-      email: intervenantEmail.value.trim() || null,
-      phone: intervenantPhone.value.trim() || null,
-      category_ids: [...intervenantCategories.value],
-      created_at: timestamp,
-      updated_at: timestamp,
-      deleted_at: null,
-    });
-  }
-  closeIntervenantSheet();
-};
-
-const toggleCategory = (categoryId: string) => {
-  const index = intervenantCategories.value.indexOf(categoryId);
-  if (index >= 0) {
-    intervenantCategories.value.splice(index, 1);
-  } else {
-    intervenantCategories.value.push(categoryId);
-  }
-};
-
-const closeIntervenantSheet = () => {
-  isIntervenantSheetOpen.value = false;
-  editingIntervenantId.value = null;
-  intervenantName.value = "";
-  intervenantEmail.value = "";
-  intervenantPhone.value = "";
-  intervenantCategories.value = [];
-};
 
 const openEditCategory = (category: Category) => {
   editingCategoryId.value = category.id;
