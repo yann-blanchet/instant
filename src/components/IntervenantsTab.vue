@@ -2,12 +2,12 @@
   <div>
     <div class="notes-section-label">Intervenants</div>
     <div class="notes-list">
-      <div v-if="props.intervenants.length === 0" class="notes-row notes-row-empty">
+      <div v-if="activeIntervenants.length === 0" class="notes-row notes-row-empty">
         No intervenants yet.
       </div>
       <div class="notes-intervenant-grid">
         <button
-          v-for="person in props.intervenants"
+          v-for="person in activeIntervenants"
           :key="person.id"
           type="button"
           class="notes-intervenant-card"
@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { db } from "../db";
 import type { Category, Intervenant } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
@@ -132,6 +132,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const activeIntervenants = computed(() =>
+  props.intervenants.filter(intervenant => !intervenant.deleted_at)
+);
 
 const intervenantName = ref("");
 const intervenantEmail = ref("");

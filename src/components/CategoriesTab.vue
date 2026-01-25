@@ -2,12 +2,12 @@
   <div>
     <div class="notes-section-label">Categories / Lots</div>
     <div class="notes-list">
-      <div v-if="props.categories.length === 0" class="notes-row notes-row-empty">
+      <div v-if="activeCategories.length === 0" class="notes-row notes-row-empty">
         No categories yet.
       </div>
       <div class="notes-category-grid">
         <button
-          v-for="category in props.categories"
+          v-for="category in activeCategories"
           :key="category.id"
           type="button"
           class="notes-category-card"
@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { db } from "../db";
 import type { Category } from "../db/types";
 import { makeId, nowIso } from "../utils/time";
@@ -150,6 +150,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const activeCategories = computed(() => 
+  props.categories.filter(cat => !cat.deleted_at)
+);
 
 const categoryName = ref("");
 const categoryColor = ref("");
@@ -224,7 +228,11 @@ const deleteCategory = () => {
 const confirmDelete = async () => {
   if (!editingCategoryId.value) return;
   try {
-    await db.categories.delete(editingCategoryId.value);
+    const timestamp = nowIso();
+    await db.categories.update(editingCategoryId.value, {
+      deleted_at: timestamp,
+      updated_at: timestamp,
+    });
     isDeleteConfirmOpen.value = false;
     closeCategorySheet();
   } catch (error) {
