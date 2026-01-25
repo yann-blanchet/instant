@@ -26,7 +26,7 @@ const getTaskAssignee = (task: Task): Intervenant | null => {
 
 const getAssigneeDisplayName = (task: Task): string => {
   const assignee = getTaskAssignee(task);
-  return assignee?.name || "Générale";
+  return assignee?.name || "Unassigned";
 };
 
 const getIntervenantCategories = (intervenant: Intervenant | null) => {

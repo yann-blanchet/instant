@@ -212,10 +212,6 @@ const summaryTasksCount = computed(() => {
   return filteredTasks.value.length;
 });
 
-const meIntervenant = computed(() => {
-  return props.intervenants.find((i) => i.name.toLowerCase() === "me");
-});
-
 const sortedTasks = computed(() => {
   let tasks: Task[] = [];
   

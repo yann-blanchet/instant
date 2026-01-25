@@ -25,25 +25,7 @@
             <div class="notes-sheet-row-name">Not assigned</div>
           </div>
         </button>
-        <button
-          v-if="meIntervenant"
-          class="notes-sheet-row"
-          type="button"
-          :class="{ active: currentIntervenantId === meIntervenant.id }"
-          @click="handleAssign(meIntervenant.id)"
-        >
-          <div class="notes-sheet-row-content">
-            <div class="notes-sheet-row-name">{{ meIntervenant.name }}</div>
-            <div v-if="getIntervenantCategories(meIntervenant).length > 0" class="notes-sheet-row-badges">
-              <CategoryBadge
-                v-for="category in getIntervenantCategories(meIntervenant)"
-                :key="category.id"
-                :category="category"
-                variant="header"
-              />
-            </div>
-          </div>
-        </button>
+
         <button
           v-for="intervenant in otherIntervenants"
           :key="intervenant.id"
@@ -85,26 +67,12 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   close: [];
   assign: [intervenantId: string | null];
-  "create-generale": [];
-  "create-me": [];
 }>();
 
 const isOpen = computed(() => props.modelValue);
 
-const meIntervenant = computed(() => {
-  return props.intervenants.find((i) => i.name.toLowerCase() === "me");
-});
-
-const generaleIntervenant = computed(() => {
-  return props.intervenants.find((i) => i.name.toLowerCase() === "générale" || i.name.toLowerCase() === "generale");
-});
-
 const otherIntervenants = computed(() => {
-  const filtered = props.intervenants.filter((i) => {
-    const nameLower = i.name.toLowerCase();
-    return nameLower !== "me" && nameLower !== "générale" && nameLower !== "generale";
-  });
-  return filtered;
+  return props.intervenants;
 });
 
 const handleClose = () => {
@@ -117,13 +85,7 @@ const handleAssign = (intervenantId: string | null) => {
   handleClose();
 };
 
-const handleAssignMe = () => {
-  emit("create-me");
-};
 
-const handleAssignGenerale = () => {
-  emit("create-generale");
-};
 
 const getIntervenantCategories = (intervenant: Intervenant) => {
   if (!intervenant?.category_ids || intervenant.category_ids.length === 0) return [];

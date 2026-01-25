@@ -208,6 +208,13 @@ const handleTerminerVisit = async () => {
   console.log("=== CLORE BUTTON CLICKED ===");
   console.log("Visit exists:", !!visit.value);
   
+  // Check if all tasks are assigned
+  const unassignedTasks = openTasks.value.filter(task => !task.intervenant_id);
+  if (unassignedTasks.length > 0) {
+    alert(`Cannot close visit: ${unassignedTasks.length} task(s) are unassigned. Please assign all tasks before closing the visit.`);
+    return;
+  }
+  
   isGeneratingPdf.value = true;
   
   try {
@@ -343,7 +350,7 @@ const getTaskAssignee = (task: Task): Intervenant | null => {
 
 const getAssigneeDisplayName = (task: Task): string => {
   const assignee = getTaskAssignee(task);
-  return assignee?.name || "Générale";
+  return assignee?.name || "Unassigned";
 };
 
 const getIntervenantCategories = (intervenant: Intervenant | null) => {
@@ -353,6 +360,14 @@ const getIntervenantCategories = (intervenant: Intervenant | null) => {
 
 const exportVisitPdf = async () => {
   if (!visit.value) return;
+  
+  // Check if all tasks are assigned
+  const unassignedTasks = openTasks.value.filter(task => !task.intervenant_id);
+  if (unassignedTasks.length > 0) {
+    alert(`Cannot generate PDF: ${unassignedTasks.length} task(s) are unassigned. Please assign all tasks before generating the PDF.`);
+    return;
+  }
+  
   const title = `Visite ${formatVisitNumber(visit.value.visit_number ?? 0)}`;
   
   const content = generatePdfContent({

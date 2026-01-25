@@ -131,11 +131,7 @@ watch(() => props.selectedIds, (newIds) => {
 
 const availableIntervenants = computed(() => {
   return props.intervenants.filter(i => {
-    const nameLower = i.name.toLowerCase();
-    return !selectedIntervenantIds.value.includes(i.id) && 
-           nameLower !== "me" && 
-           nameLower !== "générale" && 
-           nameLower !== "generale";
+    return !selectedIntervenantIds.value.includes(i.id);
   });
 });
 

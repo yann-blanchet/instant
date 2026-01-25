@@ -323,8 +323,7 @@
       :current-intervenant-id="assigningTaskId?.intervenant_id"
       @close="closeIntervenantAssignSheet"
       @assign="handleAssignIntervenantToTask"
-      @create-generale="handleCreateGeneraleIntervenant"
-      @create-me="handleCreateMeIntervenant"
+
     />
   </section>
 </template>
@@ -374,7 +373,7 @@ const managingTaskId = ref<string | null>(null);
 const editingObservationIndex = ref<number | null>(null);
 const isIntervenantAssignSheetOpen = ref(false);
 const assigningTaskId = ref<Task | null>(null);
-const currentFilterMode = ref<"open" | "me" | "date" | "summary">("open");
+const currentFilterMode = ref<"open" | "date" | "summary" | "done" | "assigned">("open");
 const isDeleteConfirmSheetOpen = ref(false);
 const deletingTask = ref<Task | null>(null);
 
@@ -1223,96 +1222,6 @@ const handleAssignIntervenantToTask = async (intervenantId: string | null) => {
   closeIntervenantAssignSheet();
 };
 
-const handleCreateMeIntervenant = async () => {
-  // Check if Me intervenant already exists globally
-  const existingMe = await db.intervenants
-    .filter((i) => i.name.toLowerCase() === "me")
-    .first();
-  
-  let meId: string;
-  
-  if (existingMe) {
-    meId = existingMe.id;
-  } else {
-    // Create Me intervenant
-    const timestamp = nowIso();
-    meId = makeId();
-    await db.intervenants.add({
-      id: meId,
-      name: "Me",
-      email: null,
-      phone: null,
-      category_ids: [],
-      created_at: timestamp,
-      updated_at: timestamp,
-      deleted_at: null,
-    });
-  }
-  
-  // Add to project if not already in project
-  if (project.value && !project.value.intervenant_ids?.includes(meId)) {
-    await db.projects.update(project.value.id, {
-      intervenant_ids: [...(project.value.intervenant_ids || []), meId],
-      updated_at: nowIso(),
-    });
-  }
-  
-  // Assign to task
-  if (assigningTaskId.value) {
-    await db.tasks.update(assigningTaskId.value.id, {
-      intervenant_id: meId,
-      updated_at: nowIso(),
-    });
-  }
-  
-  closeIntervenantAssignSheet();
-};
-
-const handleCreateGeneraleIntervenant = async () => {
-  // Check if Générale intervenant already exists globally
-  const existingGenerale = await db.intervenants
-    .filter((i) => i.name.toLowerCase() === "générale" || i.name.toLowerCase() === "generale")
-    .first();
-  
-  let generaleId: string;
-  
-  if (existingGenerale) {
-    generaleId = existingGenerale.id;
-  } else {
-    // Create Générale intervenant
-    const timestamp = nowIso();
-    generaleId = makeId();
-    await db.intervenants.add({
-      id: generaleId,
-      name: "Générale",
-      email: null,
-      phone: null,
-      category_ids: [],
-      created_at: timestamp,
-      updated_at: timestamp,
-      deleted_at: null,
-    });
-  }
-  
-  // Add to project if not already in project
-  if (project.value && !project.value.intervenant_ids?.includes(generaleId)) {
-    await db.projects.update(project.value.id, {
-      intervenant_ids: [...(project.value.intervenant_ids || []), generaleId],
-      updated_at: nowIso(),
-    });
-  }
-  
-  // Assign to task
-  if (assigningTaskId.value) {
-    await db.tasks.update(assigningTaskId.value.id, {
-      intervenant_id: generaleId,
-      updated_at: nowIso(),
-    });
-  }
-  
-  closeIntervenantAssignSheet();
-};
-
 const updatePhoto = async (photoId: string, newBlob: Blob) => {
   const timestamp = nowIso();
   
@@ -1419,7 +1328,7 @@ const confirmDeleteTask = async () => {
   closeDeleteConfirmSheet();
 };
 
-const handleFilterModeChange = (mode: "open" | "me" | "date" | "summary") => {
+const handleFilterModeChange = (mode: "open" | "date" | "summary" | "done" | "assigned") => {
   currentFilterMode.value = mode;
 };
 

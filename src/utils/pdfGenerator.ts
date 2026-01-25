@@ -105,7 +105,7 @@ const getTaskAssignee = (task: Task, intervenants: Intervenant[]): Intervenant |
 
 const getAssigneeDisplayName = (task: Task, intervenants: Intervenant[]): string => {
   const assignee = getTaskAssignee(task, intervenants);
-  return assignee?.name || "Générale";
+  return assignee?.name || "Unassigned";
 };
 
 const getIntervenantCategories = (intervenant: Intervenant | null, categories: Category[]) => {
